@@ -27,6 +27,7 @@ typedef struct {
 
 //function defs
 
+int libwebsock_send_text(int sockfd, char *strdata);
 void libwebsock_handle_client_event(libwebsock_context *ctx, libwebsock_client_state *state);
 void libwebsock_wait(libwebsock_context *ctx);
 void libwebsock_handshake(libwebsock_context *ctx, int sockfd);

@@ -34,15 +34,83 @@ void libwebsock_wait(libwebsock_context *ctx) {
 	}
 }
 
+int libwebsock_send_text(int sockfd, char *strdata)  {
+	if(strdata == NULL) {
+		fprintf(stderr, "Will not send empty message.\n");
+		return -1;
+	}
+	unsigned long long payload_len;
+	unsigned char finNopcode;
+	unsigned int payload_len_small;
+	unsigned int payload_offset = 2;
+	unsigned int len_size;
+	unsigned long long be_payload_len;
+	unsigned int sent = 0;
+	int i;
+	size_t frame_size;
+	char *data;
+	payload_len = strlen(strdata);
+	finNopcode = 0x81; //FIN and text opcode.
+	if(payload_len <= 125) {
+		frame_size = 2 + payload_len;
+		data = (void *)malloc(frame_size);
+		payload_len_small = payload_len;
+	} else if(payload_len > 125 && payload_len <= 0xffff) {
+		frame_size = 4 + payload_len;
+		data = (void *)malloc(frame_size);
+		payload_len_small = 126;
+		payload_offset += 2;
+	} else if(payload_len > 0xffff && payload_len <= 0xffffffffffffffff) {
+		frame_size = 10 + payload_len;
+		data = (void *)malloc(frame_size);
+		payload_len_small = 127;
+		payload_offset += 8;
+	} else {
+		fprintf(stderr, "Whoa man.  What are you trying to send?\n");
+		return -1;
+	}
+	payload_len_small &= 0x7f;
+	memcpy(data, &finNopcode, 1);
+	memcpy(data+1, &payload_len_small, 1); //mask bit off, 7 bit payload len
+	if(payload_len_small == 126) {
+		payload_len &= 0xffff;
+		len_size = 2;
+		for(i = 0; i < len_size; i++) {
+			memcpy(data+2+i, (void *)&payload_len+(len_size-i-1), 1);
+		}
+	}
+	if(payload_len_small == 127) {
+		payload_len &= 0xffffffffffffffff;
+		len_size = 8;
+		for(i = 0; i < len_size; i++) {
+			memcpy(data+2+i, (void *)&payload_len+(len_size-i-1), 1);
+		}
+		memcpy(data+2, &be_payload_len, 8);
+	}
+	memcpy(data+payload_offset, strdata, strlen(strdata));
+	for(sent = 0; sent < frame_size; sent++) {
+		printf("%02x ",*(data+sent) & 0xff);
+	}
+	printf("\n");
+	sent = 0;
+	
+	while(sent < frame_size) {
+		sent += send(sockfd, data+sent, frame_size, 0);
+	}
+	return 1;
+}
+
 void libwebsock_handle_client_event(libwebsock_context *ctx, libwebsock_client_state *state) {
 	char buf[1024];
 	char *payload = NULL;
 	libwebsock_message *msg = NULL;
 	unsigned char mask[4];
-	int n, i, opcode, masked, fin, payload_len, mask_offset_bytes, payload_offset;
+	unsigned long long payload_len;
+	int n, i, opcode, masked, fin, mask_offset_bytes, payload_offset, len_size;
 	n = recv(state->sockfd, buf, 1024, 0);
 	if(n < 3) {
 		fprintf(stderr, "Incomplete frame.\n");
+		exit(0);
 		return;
 	}
 	fin = (buf[0] & 0x80) == 0x80 ? 1 : 0;
@@ -61,18 +129,27 @@ void libwebsock_handle_client_event(libwebsock_context *ctx, libwebsock_client_s
 		fprintf(stderr, "Received unmasked frame from client: %d\n", state->sockfd);
 		return;
 	}
-	payload_len = ((buf[1] & 0xff) & ~0x80);
+	payload_len = ((buf[1] & 0xff) & 0x7f);
 	mask_offset_bytes = 2;
 	switch(payload_len) {
 		case 126:
 			mask_offset_bytes += 2;
+			len_size = 2;
+			for(i = 0; i < len_size; i++) {
+				memcpy((void *)&payload_len+i, buf+2+(len_size-1-i), 1);
+			}
 			//grab payload len from 16 bit following.
 			break;
 		case 127:
 			mask_offset_bytes += 8;
+			len_size = 8;
+			for(i = 0; i < len_size; i++) {
+				memcpy((void *)&payload_len+i, buf+2+(len_size-1-i), 1);
+			}
 			//grab payload len from 64 bit following
 			break;
 	}
+	fprintf(stderr, "Got payload len: %llu\n", payload_len);
 	for(i = 0;i < 4; i++) {
 		mask[i] = buf[mask_offset_bytes + i] & 0xff;
 	}
