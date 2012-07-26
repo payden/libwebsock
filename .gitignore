@@ -15,3 +15,4 @@ Makefile.in
 *.o
 test
 listen.c
+.*.swp

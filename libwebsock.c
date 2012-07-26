@@ -14,23 +14,92 @@
 void libwebsock_wait(libwebsock_context *ctx) {
 	int ret, i, new_fd;
 	socklen_t sin_size;
-	struct epoll_event ev;
+	libwebsock_client_state *client_state = NULL;
 	struct sockaddr_storage theiraddr;
 	while((ret = epoll_wait(ctx->epoll_fd, ctx->events, EPOLL_EVENTS, 1000)) >= 0) {
 		for(i = 0; i < ret; i++) {
-			if(ctx->events[i].data.fd == ctx->listen_fd) {
+			if(!ctx->events[i].data.ptr) {
 				//accepting new connection.
 				new_fd = accept(ctx->listen_fd, (struct sockaddr *)&theiraddr, &sin_size);
 				if(new_fd != -1) {
-					fprintf(stderr, "Debug: accepted new connection...\n");
+					fprintf(stderr, "DEBUG: Accepted new connection, performing handshake.\n");
 					libwebsock_handshake(ctx, new_fd);	
 				}
 			}
 			else {
-				//handle io on fd
+				client_state = (libwebsock_client_state *)ctx->events[i].data.ptr;
+				libwebsock_handle_client_event(ctx, client_state);
 			}
 		}
 	}
+}
+
+void libwebsock_handle_client_event(libwebsock_context *ctx, libwebsock_client_state *state) {
+	char buf[1024];
+	char *payload = NULL;
+	libwebsock_message *msg = NULL;
+	unsigned char mask[4];
+	int n, i, opcode, masked, fin, payload_len, mask_offset_bytes, payload_offset;
+	n = recv(state->sockfd, buf, 1024, 0);
+	if(n < 3) {
+		fprintf(stderr, "Incomplete frame.\n");
+		return;
+	}
+	fin = (buf[0] & 0x80) == 0x80 ? 1 : 0;
+	if(!fin) {
+		fprintf(stderr, "Fragment message, not handled yet.\n");
+		return;
+	}
+	opcode = buf[0] & 0x0f;
+	if(opcode != 1 && opcode != 2) {
+		fprintf(stderr, "Unhandled opcode: %d\n", opcode);
+		return;
+	}
+	
+	masked = (buf[1] & 0x80) == 0x80 ? 1 : 0;
+	if(!masked) {
+		fprintf(stderr, "Received unmasked frame from client: %d\n", state->sockfd);
+		return;
+	}
+	payload_len = ((buf[1] & 0xff) & ~0x80);
+	mask_offset_bytes = 2;
+	switch(payload_len) {
+		case 126:
+			mask_offset_bytes += 2;
+			//grab payload len from 16 bit following.
+			break;
+		case 127:
+			mask_offset_bytes += 8;
+			//grab payload len from 64 bit following
+			break;
+	}
+	for(i = 0;i < 4; i++) {
+		mask[i] = buf[mask_offset_bytes + i] & 0xff;
+	}
+	payload = (char *)malloc(payload_len);
+	if(!payload) {
+		fprintf(stderr, "Unable to allocate memory for payload.\n");
+		return;
+	}
+
+	payload_offset = mask_offset_bytes + 4;
+	for(i = 0; i < payload_len; i++) {
+		*(payload+i) = (buf[payload_offset + i] ^ mask[i % 4]) & 0xff;
+	}
+	msg = (libwebsock_message *)malloc(sizeof(libwebsock_message));
+	msg->opcode = opcode;
+	msg->payload_len = payload_len;
+	msg->payload = payload;
+	if(ctx->received_callback == NULL) {
+		fprintf(stderr, "No message received callback registered.\n");
+	}
+	else {
+		ctx->received_callback(state->sockfd, msg);
+	}
+	free(payload);	
+	free(msg);	
+	return;
+	
 }
 
 void libwebsock_handshake(libwebsock_context *ctx, int sockfd) {
@@ -42,6 +111,7 @@ void libwebsock_handshake(libwebsock_context *ctx, int sockfd) {
 	char *base64buf = NULL;
 	const char *GID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 	struct epoll_event ev;
+	libwebsock_client_state *state = NULL;
 	SHA1Context shactx;
 	SHA1Reset(&shactx);
 	memset(buf, 0, 1024);
@@ -96,7 +166,10 @@ void libwebsock_handshake(libwebsock_context *ctx, int sockfd) {
 	snprintf(buf, 1024, "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: %s\r\n\r\n", base64buf);
 	for(n = 0; n < strlen(buf);)
 		n += send(sockfd, buf+n, strlen(buf+n), 0);
-	ev.data.fd = sockfd;
+	state = (libwebsock_client_state *)malloc(sizeof(libwebsock_client_state));
+	memset(state, 0, sizeof(libwebsock_client_state));
+	state->sockfd = sockfd;
+	ev.data.ptr = state;
 	ev.events = EPOLLIN;
 	epoll_ctl(ctx->epoll_fd, EPOLL_CTL_ADD, sockfd, &ev);
 }
@@ -109,7 +182,6 @@ libwebsock_context *libwebsock_init(char *port) {
 	libwebsock_context *ctx;
 	struct addrinfo hints, *servinfo = NULL, *p = NULL;
 	struct epoll_event ev;
-	socklen_t sin_size;
 	int yes = 1;
 	ctx = (libwebsock_context *)malloc(sizeof(libwebsock_context));
 	if(!ctx) {
@@ -167,7 +239,7 @@ libwebsock_context *libwebsock_init(char *port) {
 		exit(1);
 	}
 
-	ev.data.fd = ctx->listen_fd;
+	ev.data.ptr = NULL;
 	ev.events = EPOLLIN;
 	if(epoll_ctl(ctx->epoll_fd, EPOLL_CTL_ADD, ctx->listen_fd, &ev) == -1) {
 		perror("epoll_ctl");
