@@ -11,3 +11,7 @@ Makefile.in
 /depcomp
 /install-sh
 /missing
+
+*.o
+test
+listen.c
