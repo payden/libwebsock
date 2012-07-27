@@ -97,6 +97,27 @@ int libwebsock_send_text(int sockfd, char *strdata)  {
 	return 1;
 }
 
+//used for debugging purposes
+void libwebsock_dump_frame(libwebsock_frame *frame) {
+	fprintf(stderr, "FIN: %d\n", frame->fin);
+	fprintf(stderr, "Opcode: %d\n", frame->opcode);
+	fprintf(stderr, "mask_offset: %d\n", frame->mask_offset);
+	fprintf(stderr, "payload_offset: %d\n", frame->payload_offset);
+	fprintf(stderr, "rawdata_idx: %d\n", frame->rawdata_idx);
+	fprintf(stderr, "rawdata_sz: %d\n", frame->rawdata_sz);
+	fprintf(stderr, "complete: %d\n", frame->complete);
+	fprintf(stderr, "payload_len: %llu\n", frame->payload_len);
+	fprintf(stderr, "Has previous frame: %d\n", frame->prev_frame != NULL ? 1 : 0);
+	fprintf(stderr, "Has next frame: %d\n", frame->next_frame != NULL ? 1 : 0);
+	fprintf(stderr, "Raw data:\n");
+	int i;
+	fprintf(stderr, "%02x", *(frame->rawdata) & 0xff);
+	for(i=1;i<frame->rawdata_idx;i++) {
+		fprintf(stderr, ":%02x", *(frame->rawdata+i) & 0xff);
+	}
+	fprintf(stderr, "\n");
+}
+
 void libwebsock_process_frame(libwebsock_frame *frame) {
 	//I can haz frame?  Process it and see if it's a complete frame, and also whether or not FIN bit is set
 	int i, fin, opcode, payload_len;
@@ -107,6 +128,12 @@ void libwebsock_process_frame(libwebsock_frame *frame) {
 	}
 	frame->fin = (*(frame->rawdata) & 0x80) == 0x80 ? 1 : 0;
 	frame->opcode = (*(frame->rawdata) & 0x0f);
+	if(frame->opcode != 1 && frame->opcode != 2) {
+		fprintf(stderr, "Unimplemented opcode used: %d\n",frame->opcode);
+		libwebsock_dump_frame(frame);
+		exit(0);
+		return;
+	}
 	if(*(frame->rawdata+1) & 0x80 != 0x80) {
 		fprintf(stderr, "Received unmasked frame from client.  Need to fail this websocket.\n");
 		exit(1);
@@ -157,6 +184,8 @@ void libwebsock_process_frame(libwebsock_frame *frame) {
 	}
 	//have full frame.
 	frame->complete = 1;
+	libwebsock_dump_frame(frame);
+	fprintf(stderr,"\n\n\n");
 	
 
 	
@@ -207,7 +236,7 @@ void libwebsock_handle_client_event(libwebsock_context *ctx, libwebsock_client_s
 		return;
 	}
 		
-	if(current->rawdata_sz - current->rawdata_idx >= n) {
+	if(current->rawdata_sz - current->rawdata_idx <= n) {
 		current->rawdata_sz += 1024; //allocate in 1k chunks
 		current->rawdata = realloc(current->rawdata, current->rawdata_sz);
 		memset(current->rawdata+current->rawdata_idx, 0, current->rawdata_sz - current->rawdata_idx);

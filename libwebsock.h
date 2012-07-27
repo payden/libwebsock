@@ -17,7 +17,6 @@ typedef struct _libwebsock_frame {
 	struct _libwebsock_frame *next_frame;
 	struct _libwebsock_frame *prev_frame;
 	unsigned char mask[4];
-	unsigned char mask_payload_len;
 } libwebsock_frame;
 
 
@@ -46,6 +45,8 @@ typedef struct {
 //function defs
 
 int libwebsock_send_text(int sockfd, char *strdata);
+void libwebsock_dump_frame(libwebsock_frame *frame);
+void libwebsock_process_frame(libwebsock_frame *frame);
 void libwebsock_handle_client_event(libwebsock_context *ctx, libwebsock_client_state *state);
 void libwebsock_wait(libwebsock_context *ctx);
 void libwebsock_handshake(libwebsock_context *ctx, int sockfd);
