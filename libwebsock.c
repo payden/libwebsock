@@ -69,6 +69,7 @@ int libwebsock_send_text(int sockfd, char *strdata)  {
 		fprintf(stderr, "Whoa man.  What are you trying to send?\n");
 		return -1;
 	}
+	memset(data, 0, frame_size);
 	payload_len_small &= 0x7f;
 	memcpy(data, &finNopcode, 1);
 	memcpy(data+1, &payload_len_small, 1); //mask bit off, 7 bit payload len
@@ -100,85 +101,196 @@ int libwebsock_send_text(int sockfd, char *strdata)  {
 	return 1;
 }
 
-void libwebsock_handle_client_event(libwebsock_context *ctx, libwebsock_client_state *state) {
-	char buf[1024];
-	char *payload = NULL;
-	libwebsock_message *msg = NULL;
-	unsigned char mask[4];
-	unsigned long long payload_len;
-	int n, i, opcode, masked, fin, mask_offset_bytes, payload_offset, len_size;
-	n = recv(state->sockfd, buf, 1024, 0);
-	if(n < 3) {
-		fprintf(stderr, "Incomplete frame.\n");
-		exit(0);
+void libwebsock_process_frame(libwebsock_frame *frame) {
+	//I can haz frame?  Process it and see if it's a complete frame, and also whether or not FIN bit is set
+	int i, fin, opcode, payload_len;
+	unsigned long long payload_len_long = 0;
+	printf("Received frame data..\n");
+	for(i=0;i<frame->rawdata_idx;i++) {
+		printf("%02x ", *(frame->rawdata+i) & 0xff);
+	}
+	printf("\n");
+	if(frame->rawdata_idx < 2) {
+		//haven't received enough header.  Need at least 2 bytes for FIN/opcode mask/payload_len
 		return;
 	}
-	fin = (buf[0] & 0x80) == 0x80 ? 1 : 0;
-	if(!fin) {
-		fprintf(stderr, "Fragment message, not handled yet.\n");
-		return;
+	frame->fin = (*(frame->rawdata) & 0x80) == 0x80 ? 1 : 0;
+	frame->opcode = (*(frame->rawdata) & 0x0f);
+	if(*(frame->rawdata+1) & 0x80 != 0x80) {
+		fprintf(stderr, "Received unmasked frame from client.  Need to fail this websocket.\n");
+		exit(1);
 	}
-	opcode = buf[0] & 0x0f;
-	if(opcode != 1 && opcode != 2) {
-		fprintf(stderr, "Unhandled opcode: %d\n", opcode);
-		return;
-	}
-	
-	masked = (buf[1] & 0x80) == 0x80 ? 1 : 0;
-	if(!masked) {
-		fprintf(stderr, "Received unmasked frame from client: %d\n", state->sockfd);
-		return;
-	}
-	payload_len = ((buf[1] & 0xff) & 0x7f);
-	mask_offset_bytes = 2;
+	frame->mask_offset = 2;
+	payload_len = *(frame->rawdata+1) & 0x7f;
 	switch(payload_len) {
 		case 126:
-			mask_offset_bytes += 2;
-			len_size = 2;
-			for(i = 0; i < len_size; i++) {
-				memcpy((void *)&payload_len+i, buf+2+(len_size-1-i), 1);
+			fprintf(stderr, "Received frame with payload size 126..  16 bit extended.\n");
+			if(frame->rawdata_idx < 4) {
+				fprintf(stderr, "Frame has 16 bit payload len, but not enough bytes to read it yet.\n");
+				return;
 			}
-			//grab payload len from 16 bit following.
+			for(i = 0; i < 2; i++) {
+				memcpy((void *)&payload_len_long, frame->rawdata+2-i, 1);
+			}
+			frame->mask_offset += 2;
+			frame->payload_len = payload_len_long;
 			break;
 		case 127:
-			mask_offset_bytes += 8;
-			len_size = 8;
-			for(i = 0; i < len_size; i++) {
-				memcpy((void *)&payload_len+i, buf+2+(len_size-1-i), 1);
+			if(frame->rawdata_idx < 10) {
+				fprintf(stderr, "Frame has 64 bit payload len, but not enough bytes to read it yet.\n");
+				return;
 			}
-			//grab payload len from 64 bit following
+			fprintf(stderr, "Received frame with payload size 127.. 64 bit extended.\n");
+			for(i = 0; i < 8; i++) {
+				memcpy((void *)&payload_len_long, frame->rawdata+8-i, 1);
+			}
+			frame->mask_offset += 8;
+			frame->payload_len = payload_len_long;
+			break;
+		default:
+			frame->payload_len = payload_len;
 			break;
 	}
-	fprintf(stderr, "Got payload len: %llu\n", payload_len);
-	for(i = 0;i < 4; i++) {
-		mask[i] = buf[mask_offset_bytes + i] & 0xff;
+	for(i=0;i<4;i++) {
+		frame->mask[i] = *(frame->rawdata+frame->mask_offset+i) & 0xff;
 	}
-	payload = (char *)malloc(payload_len);
-	if(!payload) {
-		fprintf(stderr, "Unable to allocate memory for payload.\n");
-		return;
+	frame->payload_offset = frame->mask_offset + 4;
+	if(payload_len <= 125) {
+		if(frame->rawdata_idx < frame->mask_offset + payload_len) {
+			fprintf(stderr, "Haven't received full frame yet.  Waiting on payload.\n");
+			return;
+		}
+	} else {
+		if(frame->rawdata_idx < frame->mask_offset + payload_len_long) {
+			fprintf(stderr, "Haven't received full frame yet.  Waiting on payload.\n");
+			return;
+		}
 	}
+	//have full frame.
+	fprintf(stderr, "Have full frame... setting flag..\n");
+	fprintf(stderr, "Let's dump some data about frame: \n");
+	fprintf(stderr, "FIN: %d, opcode: %d, mask_offset: %d, payload_offset: %d, rawdata_idx: %d\n", frame->fin, frame->opcode, frame->mask_offset, frame->payload_offset, frame->rawdata_idx);
+	fprintf(stderr, "Payload len: %llu\n", frame->payload_len);
+	fprintf(stderr, "Mask: ");
+	for(i=0;i<4;i++) {
+		fprintf(stderr, "%02x ", frame->mask[i] & 0xff);
+	}
+	fprintf(stderr, "\n");
+	fprintf(stderr, "Frame payload: ");
+	for(i=0;i<frame->payload_len;i++) {
+		fprintf(stderr, "%02x ", (*(frame->rawdata+frame->payload_offset+i) ^ frame->mask[i % 4]) & 0xff);
+	}
+	fprintf(stderr, "\n");
+	frame->complete = 1;
+	
 
-	payload_offset = mask_offset_bytes + 4;
-	for(i = 0; i < payload_len; i++) {
-		*(payload+i) = (buf[payload_offset + i] ^ mask[i % 4]) & 0xff;
-	}
-	msg = (libwebsock_message *)malloc(sizeof(libwebsock_message));
-	msg->opcode = opcode;
-	msg->payload_len = payload_len;
-	msg->payload = payload;
-	if(ctx->received_callback == NULL) {
-		fprintf(stderr, "No message received callback registered.\n");
-	}
-	else {
-		ctx->received_callback(state->sockfd, msg);
-	}
-	free(payload);	
-	free(msg);	
-	return;
 	
 }
 
+void libwebsock_free_all_frames(libwebsock_client_state *state) {
+	libwebsock_frame *current;
+	if(state != NULL) {
+		if(state->current_frame != NULL) {
+			current = state->current_frame;
+			for(;current->prev_frame != NULL;current = current->prev_frame) {}
+			for(;current != NULL; current = current->next_frame) {
+				if(current->prev_frame != NULL) {
+					free(current->prev_frame);
+				}
+				if(current->rawdata != NULL) {
+					free(current->rawdata);
+				}
+			}
+			free(current);
+		}
+	}
+}
+				
+
+void libwebsock_handle_client_event(libwebsock_context *ctx, libwebsock_client_state *state) {
+	char buf[1024];
+	libwebsock_frame *current, *new;
+	libwebsock_message *message;
+	int n, payload_len, i, message_opcode;
+	unsigned long long message_payload_size, message_offset;
+	char *message_payload = NULL;
+	current = state->current_frame;
+	if(current == NULL) {
+		current = (libwebsock_frame *)malloc(sizeof(libwebsock_frame));
+		state->current_frame = current;
+		memset(current, 0, sizeof(libwebsock_frame));
+		current->rawdata_sz = 1024;
+		current->rawdata = (char *)malloc(1024);
+		memset(current->rawdata, 0, 1024);
+	}		
+	n = recv(state->sockfd, buf, 1023, 0);
+	if(n == 0) {
+		fprintf(stderr, "Client closed connection.\n");
+		libwebsock_free_all_frames(state);
+		close(state->sockfd);
+		free(state);
+		return;
+	}
+		
+	if(current->rawdata_sz - current->rawdata_idx >= n) {
+		current->rawdata_sz += 1024; //allocate in 1k chunks
+		current->rawdata = realloc(current->rawdata, current->rawdata_sz);
+		memset(current->rawdata+current->rawdata_idx, 0, current->rawdata_sz - current->rawdata_idx);
+	}
+	memcpy(current->rawdata + current->rawdata_idx, buf, n);
+	current->rawdata_idx += n;
+	libwebsock_process_frame(current);
+	if(current->complete) {
+		if(current->fin) {
+			message_payload_size = current->payload_len;
+			for(;current->prev_frame != NULL;current = current->prev_frame) {
+				message_payload_size += current->payload_len;
+			}
+			fprintf(stderr, "Message payload size: %llu\n",message_payload_size);
+			message_offset = 0;
+			message_opcode = current->opcode;
+			message_payload_size += 1;
+			message_payload = (char *)malloc(message_payload_size); //unsure what's a safe limit on this?
+			memset(message_payload, 0, message_payload_size);
+			for(;current != NULL; current = current->next_frame) {
+				if(current->prev_frame != NULL) {
+					free(current->prev_frame);
+				}
+				for(i = 0; i < current->payload_len; i++) {
+					*(current->rawdata+current->payload_offset+i) ^= (current->mask[i % 4] & 0xff);
+				}
+				memcpy(message_payload + message_offset, current->rawdata + current->payload_offset, current->payload_len);
+				free(current->rawdata);
+				message_offset += current->payload_len;
+			}
+			message = (libwebsock_message *)malloc(sizeof(libwebsock_message));
+			memset(message, 0, sizeof(libwebsock_message));
+			message->opcode = message_opcode;
+			message->payload_len = message_offset;
+			message->payload = message_payload;
+			if(ctx->received_callback != NULL) {
+				fprintf(stderr, "Calling callback with message.\n");
+				ctx->received_callback(state->sockfd, message);
+			}
+			else {
+				fprintf(stderr, "No received callback registered with library.\n");
+			}
+			free(message->payload);
+			free(message);
+			state->current_frame = NULL;
+		}
+		else {
+			//here we need to do some frame linking
+			new = (libwebsock_frame *)malloc(sizeof(libwebsock_frame));
+			memset(new, 0, sizeof(libwebsock_frame));
+			new->rawdata = (char *)malloc(1024);
+			new->prev_frame = current;
+			current->next_frame = new;
+			current = new;
+			state->current_frame = current; //update client state to point at new current frame
+		}
+	}	
+}
 void libwebsock_handshake(libwebsock_context *ctx, int sockfd) {
 	//probably shouldn't have a static size for handshake buffer, maybe some better programmers can learn me in this.
 	char buf[1024];
