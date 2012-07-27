@@ -89,10 +89,6 @@ int libwebsock_send_text(int sockfd, char *strdata)  {
 		memcpy(data+2, &be_payload_len, 8);
 	}
 	memcpy(data+payload_offset, strdata, strlen(strdata));
-	for(sent = 0; sent < frame_size; sent++) {
-		printf("%02x ",*(data+sent) & 0xff);
-	}
-	printf("\n");
 	sent = 0;
 	
 	while(sent < frame_size) {
@@ -105,11 +101,6 @@ void libwebsock_process_frame(libwebsock_frame *frame) {
 	//I can haz frame?  Process it and see if it's a complete frame, and also whether or not FIN bit is set
 	int i, fin, opcode, payload_len;
 	unsigned long long payload_len_long = 0;
-	printf("Received frame data..\n");
-	for(i=0;i<frame->rawdata_idx;i++) {
-		printf("%02x ", *(frame->rawdata+i) & 0xff);
-	}
-	printf("\n");
 	if(frame->rawdata_idx < 2) {
 		//haven't received enough header.  Need at least 2 bytes for FIN/opcode mask/payload_len
 		return;
@@ -124,13 +115,12 @@ void libwebsock_process_frame(libwebsock_frame *frame) {
 	payload_len = *(frame->rawdata+1) & 0x7f;
 	switch(payload_len) {
 		case 126:
-			fprintf(stderr, "Received frame with payload size 126..  16 bit extended.\n");
 			if(frame->rawdata_idx < 4) {
 				fprintf(stderr, "Frame has 16 bit payload len, but not enough bytes to read it yet.\n");
 				return;
 			}
 			for(i = 0; i < 2; i++) {
-				memcpy((void *)&payload_len_long, frame->rawdata+2-i, 1);
+				memcpy((void *)&payload_len_long+i, frame->rawdata+3-i, 1);
 			}
 			frame->mask_offset += 2;
 			frame->payload_len = payload_len_long;
@@ -140,9 +130,8 @@ void libwebsock_process_frame(libwebsock_frame *frame) {
 				fprintf(stderr, "Frame has 64 bit payload len, but not enough bytes to read it yet.\n");
 				return;
 			}
-			fprintf(stderr, "Received frame with payload size 127.. 64 bit extended.\n");
 			for(i = 0; i < 8; i++) {
-				memcpy((void *)&payload_len_long, frame->rawdata+8-i, 1);
+				memcpy((void *)&payload_len_long+i, frame->rawdata+9-i, 1);
 			}
 			frame->mask_offset += 8;
 			frame->payload_len = payload_len_long;
@@ -167,20 +156,6 @@ void libwebsock_process_frame(libwebsock_frame *frame) {
 		}
 	}
 	//have full frame.
-	fprintf(stderr, "Have full frame... setting flag..\n");
-	fprintf(stderr, "Let's dump some data about frame: \n");
-	fprintf(stderr, "FIN: %d, opcode: %d, mask_offset: %d, payload_offset: %d, rawdata_idx: %d\n", frame->fin, frame->opcode, frame->mask_offset, frame->payload_offset, frame->rawdata_idx);
-	fprintf(stderr, "Payload len: %llu\n", frame->payload_len);
-	fprintf(stderr, "Mask: ");
-	for(i=0;i<4;i++) {
-		fprintf(stderr, "%02x ", frame->mask[i] & 0xff);
-	}
-	fprintf(stderr, "\n");
-	fprintf(stderr, "Frame payload: ");
-	for(i=0;i<frame->payload_len;i++) {
-		fprintf(stderr, "%02x ", (*(frame->rawdata+frame->payload_offset+i) ^ frame->mask[i % 4]) & 0xff);
-	}
-	fprintf(stderr, "\n");
 	frame->complete = 1;
 	
 

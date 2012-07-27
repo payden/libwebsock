@@ -16,7 +16,6 @@ int my_message_callback(int sockfd, libwebsock_message *msg) {
 	printf("Received message from %d\n",sockfd);
 	printf("Opcode: %d\n",msg->opcode);
 	printf("Payload length: %llu\n", msg->payload_len);
-	printf("Payload: %s\n", msg->payload);
 	libwebsock_send_text(sockfd, msg->payload);
 	return 0;
 }
