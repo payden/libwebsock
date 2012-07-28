@@ -93,6 +93,7 @@ int libwebsock_send_text(int sockfd, char *strdata)  {
 	while(sent < frame_size) {
 		sent += send(sockfd, data+sent, frame_size, 0);
 	}
+	free(data);
 	return 1;
 }
 
@@ -210,10 +211,24 @@ void libwebsock_in_data(libwebsock_context *ctx, libwebsock_client_state *state,
 	}
 }
 
+void libwebsock_cleanup_frames(libwebsock_frame *first) {
+	libwebsock_frame *this = NULL;
+	libwebsock_frame *next = first;
+	while(next != NULL) {
+		this = next;
+		next = this->next_frame;
+		if(this->rawdata != NULL) {
+			free(this->rawdata);
+		}
+		free(this);
+	}
+}
+
 void libwebsock_dispatch_message(libwebsock_context *ctx, libwebsock_client_state *state, libwebsock_frame *current) {
 	unsigned long long message_payload_len, message_offset;
 	int message_opcode, i;
 	char *message_payload;
+	libwebsock_frame *first = NULL;
 	libwebsock_message *msg = NULL;
 	if(current == NULL) {
 		fprintf(stderr, "Somehow, null pointer passed to libwebsock_dispatch_message.\n");
@@ -224,6 +239,7 @@ void libwebsock_dispatch_message(libwebsock_context *ctx, libwebsock_client_stat
 	for(;current->prev_frame != NULL;current = current->prev_frame) {
 		message_payload_len += current->payload_len;
 	}
+	first = current;
 	message_opcode = current->opcode;
 	message_payload = (char *)malloc(message_payload_len + 1);
 	memset(message_payload, 0, message_payload_len + 1);
@@ -235,6 +251,9 @@ void libwebsock_dispatch_message(libwebsock_context *ctx, libwebsock_client_stat
 		memcpy(message_payload + message_offset, current->rawdata + current->payload_offset, current->payload_len);
 		message_offset += current->payload_len;
 	}
+
+	libwebsock_cleanup_frames(first);
+
 	msg = (libwebsock_message *)malloc(sizeof(libwebsock_message));
 	memset(msg, 0, sizeof(libwebsock_message));
 	msg->opcode = message_opcode;
