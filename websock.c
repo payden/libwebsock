@@ -195,6 +195,11 @@ void libwebsock_handle_control_frame(libwebsock_context *ctx, libwebsock_client_
 	memset(ctl_frame->rawdata, 0, FRAME_CHUNK_LENGTH);
 }
 
+int libwebsock_default_receive_callback(libwebsock_client_state *state, libwebsock_message *msg) {
+	libwebsock_send_text(state->sockfd, msg->payload);
+	return 0;
+}
+
 int libwebsock_default_control_callback(libwebsock_client_state *state, libwebsock_frame *ctl_frame) {
 	int i;
 	switch(ctl_frame->opcode) {
@@ -304,8 +309,8 @@ void libwebsock_dispatch_message(libwebsock_context *ctx, libwebsock_client_stat
 	msg->opcode = message_opcode;
 	msg->payload_len = message_offset;
 	msg->payload = message_payload;
-	if(ctx->received_callback != NULL) {
-		ctx->received_callback(state->sockfd, msg);
+	if(ctx->receive_callback != NULL) {
+		ctx->receive_callback(state, msg);
 	} else {
 		fprintf(stderr, "No received call back registered with libwebsock.\n");
 	}
@@ -437,8 +442,8 @@ void libwebsock_handshake(libwebsock_context *ctx, int sockfd) {
 	epoll_ctl(ctx->epoll_fd, EPOLL_CTL_ADD, sockfd, &ev);
 }
 
-void libwebsock_set_receive_cb(libwebsock_context *ctx, int (*cb)(int, libwebsock_message* msg)) {
-	ctx->received_callback = cb;
+void libwebsock_set_receive_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state *state, libwebsock_message* msg)) {
+	ctx->receive_callback = cb;
 }
 
 void libwebsock_set_control_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state *state, libwebsock_frame* ctl_frame)) {
@@ -459,6 +464,7 @@ libwebsock_context *libwebsock_init(char *port) {
 	strncpy(ctx->port, port, PORT_STRLEN);
 
 	libwebsock_set_control_cb(ctx, &libwebsock_default_control_callback);
+	libwebsock_set_receive_cb(ctx, &libwebsock_default_receive_callback);
 
 	if((ctx->epoll_fd = epoll_create(EPOLL_EVENTS)) == -1) {
 		perror("epoll");

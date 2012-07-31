@@ -7,23 +7,41 @@
 /*
 
 Define message callback with same prototype as below.
-Accepts int for socket descriptor (unique to client) and libwebsock_message structure.
+Accepts pointer to libwebsock_client_state structure and pointer to libwebsock_message structure.
+libwebsock_client_state has int sockfd, int sent_close_frame, int should_close, and libwebsock_frame *current_frame
 libwebsock_message has unsigned int opcode, unsigned long long payload_len, and char *payload
 
-*/
-int my_message_callback(int sockfd, libwebsock_message *msg) {
-	printf("Received message from %d\n",sockfd);
-	printf("Opcode: %d\n",msg->opcode);
-	printf("Payload length: %llu\n", msg->payload_len);
-	printf("\n\n");
-	libwebsock_send_text(sockfd, msg->payload);
+You probably shouldn't modify any of the data contained in the structures passed to the callback.  It will probably cause bad things to happen.
+You can, of course, make copies of the data contained therein.
+
+Here is the default receive_callback as an example:
+(libwebsock_send_text accepts socket descriptor and character array)
+
+int some_callback_name(libwebsock_client_state *state, libwebsock_message *msg) {
+	libwebsock_send_text(state->sockfd, msg->payload);
 	return 0;
 }
+
+This callback just provides echoing messages back to the websocket client.
+
+*/
+
+//Here is a little more verbose version of the echo server.
+
+int my_receive_callback(libwebsock_client_state *state, libwebsock_message *msg) {
+	printf("Socket Descriptor: %d\n", state->sockfd);
+	printf("Message opcode: %d\n", msg->opcode);
+	printf("Payload Length: %llu\n", msg->payload_len);
+	printf("Payload: %s\n", msg->payload);
+	//now let's send it back.
+	libwebsock_send_text(state->sockfd, msg->payload);
+}
+
 
 int main(int argc, char **argv) {
 	libwebsock_context *ctx;
 	ctx = (libwebsock_context *)libwebsock_init("3333");
-	libwebsock_set_receive_cb(ctx, &my_message_callback);
+	libwebsock_set_receive_cb(ctx, &my_receive_callback);
 	libwebsock_wait(ctx);
 	free(ctx->events);
 	free(ctx);
