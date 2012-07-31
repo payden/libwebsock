@@ -450,6 +450,11 @@ void libwebsock_set_control_cb(libwebsock_context *ctx, int (*cb)(libwebsock_cli
 	ctx->control_callback = cb;
 }
 
+void libwebsock_shutdown(libwebsock_context *ctx) {
+	free(ctx->events);
+	free(ctx);
+}
+
 libwebsock_context *libwebsock_init(char *port) {
 	libwebsock_context *ctx;
 	struct addrinfo hints, *servinfo = NULL, *p = NULL;

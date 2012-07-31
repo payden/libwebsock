@@ -24,7 +24,14 @@ int some_callback_name(libwebsock_client_state *state, libwebsock_message *msg) 
 
 This callback just provides echoing messages back to the websocket client.
 
+You would register this callback via:
+
+libwebsock_set_receive_cb(ctx, &some_callback_name);
+
+
+
 */
+
 
 //Here is a little more verbose version of the echo server.
 
@@ -37,13 +44,14 @@ int my_receive_callback(libwebsock_client_state *state, libwebsock_message *msg)
 	libwebsock_send_text(state->sockfd, msg->payload);
 }
 
-
 int main(int argc, char **argv) {
-	libwebsock_context *ctx;
+	libwebsock_context *ctx = NULL;
 	ctx = (libwebsock_context *)libwebsock_init("3333");
+	if(ctx == NULL) {
+		fprintf(stderr, "Error during libwebsock_init.\n");
+		exit(1);
+	}
 	libwebsock_set_receive_cb(ctx, &my_receive_callback);
 	libwebsock_wait(ctx);
-	free(ctx->events);
-	free(ctx);
 	return 0;
 }
