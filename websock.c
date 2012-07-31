@@ -29,6 +29,11 @@ void libwebsock_wait(libwebsock_context *ctx) {
 			else {
 				client_state = (libwebsock_client_state *)ctx->events[i].data.ptr;
 				libwebsock_handle_client_event(ctx, client_state);
+				if(client_state->should_close == 1) {
+					close(client_state->sockfd);
+					free(client_state);
+					client_state = NULL;
+				}
 			}
 		}
 	}
@@ -91,7 +96,7 @@ int libwebsock_send_text(int sockfd, char *strdata)  {
 	sent = 0;
 	
 	while(sent < frame_size) {
-		sent += send(sockfd, data+sent, frame_size, 0);
+		sent += send(sockfd, data+sent, frame_size - sent, 0);
 	}
 	free(data);
 	return 1;
@@ -105,7 +110,6 @@ void libwebsock_dump_frame(libwebsock_frame *frame) {
 	fprintf(stderr, "payload_offset: %d\n", frame->payload_offset);
 	fprintf(stderr, "rawdata_idx: %d\n", frame->rawdata_idx);
 	fprintf(stderr, "rawdata_sz: %d\n", frame->rawdata_sz);
-	fprintf(stderr, "complete: %d\n", frame->complete);
 	fprintf(stderr, "payload_len: %llu\n", frame->payload_len);
 	fprintf(stderr, "Has previous frame: %d\n", frame->prev_frame != NULL ? 1 : 0);
 	fprintf(stderr, "Has next frame: %d\n", frame->next_frame != NULL ? 1 : 0);
@@ -175,6 +179,43 @@ void libwebsock_handle_recv(libwebsock_context *ctx, libwebsock_client_state *st
 
 }
 
+void libwebsock_handle_control_frame(libwebsock_context *ctx, libwebsock_client_state *state, libwebsock_frame *ctl_frame) {
+	libwebsock_frame *ptr = NULL;
+	ctx->control_callback(state, ctl_frame);
+	//the idea here is to reset this frame to the state it was in before we received control frame.
+	// Control frames can be injected in the midst of a fragmented message.
+	// We need to maintain the link to previous frame if present.
+	// It should be noted that ctl_frame is still state->current_frame after this function returns.
+	// So even though the below refers to ctl_frame, I'm really setting up state->current_frame to continue receiving data on the next go 'round
+	ptr = ctl_frame->prev_frame; //This very well may be a NULL pointer, but just in case we preserve it.
+	free(ctl_frame->rawdata);
+	memset(ctl_frame, 0, sizeof(libwebsock_frame));
+	ctl_frame->prev_frame = ptr;
+	ctl_frame->rawdata = (char *)malloc(FRAME_CHUNK_LENGTH);
+	memset(ctl_frame->rawdata, 0, FRAME_CHUNK_LENGTH);
+}
+
+int libwebsock_default_control_callback(libwebsock_client_state *state, libwebsock_frame *ctl_frame) {
+	int i;
+	switch(ctl_frame->opcode) {
+		case 0x8:
+			//close frame
+			if(state->sent_close_frame == 0) {
+				//client request close.  Send close frame as acknowledgement.
+				for(i=0;i<ctl_frame->payload_len;i++)
+					*(ctl_frame->rawdata + ctl_frame->payload_offset + i) ^= (ctl_frame->mask[i % 4] & 0xff); //demask payload
+				*(ctl_frame->rawdata + 1) &= 0x7f; //strip mask bit
+				i = 0;
+				while(i < ctl_frame->payload_offset + ctl_frame->payload_len) {
+					i += send(state->sockfd, ctl_frame->rawdata + i, ctl_frame->payload_offset + ctl_frame->payload_len - i, 0);
+				}
+			}
+			state->should_close = 1;
+			break;
+	}
+	return 1;
+}
+
 void libwebsock_in_data(libwebsock_context *ctx, libwebsock_client_state *state, char byte) {
 	libwebsock_frame *current = NULL, *new = NULL;
 	unsigned char payload_len_short;
@@ -194,10 +235,14 @@ void libwebsock_in_data(libwebsock_context *ctx, libwebsock_client_state *state,
 	}
 	*(current->rawdata + current->rawdata_idx++) = byte;
 	if(libwebsock_complete_frame(current) == 1) {
-		state->num_frames++;
 		if(current->fin == 1) {
-			libwebsock_dispatch_message(ctx, state, current);
-			state->current_frame = NULL;
+			//is control frame
+			if((current->opcode & 0x08) == 0x08) {
+				libwebsock_handle_control_frame(ctx, state, current);
+			} else {
+				libwebsock_dispatch_message(ctx, state, current);
+				state->current_frame = NULL;
+			}
 		} else {
 			new = (libwebsock_frame *)malloc(sizeof(libwebsock_frame));
 			memset(new, 0, sizeof(libwebsock_frame));
@@ -396,6 +441,10 @@ void libwebsock_set_receive_cb(libwebsock_context *ctx, int (*cb)(int, libwebsoc
 	ctx->received_callback = cb;
 }
 
+void libwebsock_set_control_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state *state, libwebsock_frame* ctl_frame)) {
+	ctx->control_callback = cb;
+}
+
 libwebsock_context *libwebsock_init(char *port) {
 	libwebsock_context *ctx;
 	struct addrinfo hints, *servinfo = NULL, *p = NULL;
@@ -408,6 +457,9 @@ libwebsock_context *libwebsock_init(char *port) {
 	}
 	memset(ctx, 0, sizeof(libwebsock_context));
 	strncpy(ctx->port, port, PORT_STRLEN);
+
+	libwebsock_set_control_cb(ctx, &libwebsock_default_control_callback);
+
 	if((ctx->epoll_fd = epoll_create(EPOLL_EVENTS)) == -1) {
 		perror("epoll");
 		free(ctx);

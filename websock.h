@@ -6,6 +6,7 @@
 #define FRAME_CHUNK_LENGTH 1024
 #define MASK_LENGTH 4
 
+
 typedef struct _libwebsock_frame {
 	unsigned int fin;
 	unsigned int opcode;
@@ -13,7 +14,6 @@ typedef struct _libwebsock_frame {
 	unsigned int payload_offset;
 	unsigned int rawdata_idx;
 	unsigned int rawdata_sz;
-	unsigned int complete;
 	unsigned long long payload_len;
 	char *rawdata;
 	struct _libwebsock_frame *next_frame;
@@ -21,32 +21,39 @@ typedef struct _libwebsock_frame {
 	unsigned char mask[4];
 } libwebsock_frame;
 
-
-typedef struct {
+typedef struct _libwebsock_message {
 	unsigned int opcode;
 	unsigned long long payload_len;
 	char *payload;
 } libwebsock_message;
 
-typedef struct {
+typedef struct _libwebsock_client_state {
+	int sockfd;
+	int sent_close_frame;
+	int should_close;
+	char *data;
+	libwebsock_frame *current_frame;
+} libwebsock_client_state;
+
+typedef struct _libwebsock_context {
 	int listen_fd;
 	int epoll_fd;
 	int (*received_callback)(int, libwebsock_message*);
+	int (*control_callback)(libwebsock_client_state*, libwebsock_frame*);
 	char port[PORT_STRLEN];
 	struct epoll_event *events;
 } libwebsock_context;
 
-typedef struct {
-	int sockfd;
-	int num_frames;
-	char *data;
-	libwebsock_frame *current_frame;
-} libwebsock_client_state;
+
+
+
 
 //function defs
 
 int libwebsock_send_text(int sockfd, char *strdata);
 int libwebsock_complete_frame(libwebsock_frame *frame);
+int libwebsock_default_control_callback(libwebsock_client_state *state, libwebsock_frame *ctl_frame);
+void libwebsock_handle_control_frame(libwebsock_context *ctx, libwebsock_client_state *state, libwebsock_frame *ctl_frame);
 void libwebsock_dispatch_message(libwebsock_context *ctx, libwebsock_client_state *state, libwebsock_frame *current);
 void libwebsock_in_data(libwebsock_context *ctx, libwebsock_client_state *state, char byte);
 void libwebsock_dump_frame(libwebsock_frame *frame);
