@@ -49,7 +49,7 @@ typedef struct _libwebsock_context {
 
 //function defs
 
-
+int libwebsock_send_binary(int sockfd, char *in_data, unsigned long long datalen);
 int libwebsock_send_text(int sockfd, char *strdata);
 int libwebsock_complete_frame(libwebsock_frame *frame);
 int libwebsock_default_receive_callback(libwebsock_client_state *state, libwebsock_message *msg);

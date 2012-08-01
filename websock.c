@@ -39,6 +39,65 @@ void libwebsock_wait(libwebsock_context *ctx) {
 	}
 }
 
+int libwebsock_send_binary(int sockfd, char *in_data, unsigned long long datalen) {
+	unsigned long long payload_len;
+	unsigned char finNopcode;
+	unsigned int payload_len_small;
+	unsigned int payload_offset = 2;
+	unsigned int len_size;
+	unsigned long long be_payload_len;
+	unsigned int sent = 0;
+	int i;
+	size_t frame_size;
+	char *data;
+	payload_len = datalen;
+	finNopcode = 0x82; //FIN and binary opcode.
+	if(payload_len <= 125) {
+		frame_size = 2 + payload_len;
+		data = (void *)malloc(frame_size);
+		payload_len_small = payload_len;
+	} else if(payload_len > 125 && payload_len <= 0xffff) {
+		frame_size = 4 + payload_len;
+		data = (void *)malloc(frame_size);
+		payload_len_small = 126;
+		payload_offset += 2;
+	} else if(payload_len > 0xffff && payload_len <= 0xffffffffffffffff) {
+		frame_size = 10 + payload_len;
+		data = (void *)malloc(frame_size);
+		payload_len_small = 127;
+		payload_offset += 8;
+	} else {
+		fprintf(stderr, "Whoa man.  What are you trying to send?\n");
+		return -1;
+	}
+	memset(data, 0, frame_size);
+	payload_len_small &= 0x7f;
+	memcpy(data, &finNopcode, 1);
+	memcpy(data+1, &payload_len_small, 1); //mask bit off, 7 bit payload len
+	if(payload_len_small == 126) {
+		payload_len &= 0xffff;
+		len_size = 2;
+		for(i = 0; i < len_size; i++) {
+			memcpy(data+2+i, (void *)&payload_len+(len_size-i-1), 1);
+		}
+	}
+	if(payload_len_small == 127) {
+		payload_len &= 0xffffffffffffffff;
+		len_size = 8;
+		for(i = 0; i < len_size; i++) {
+			memcpy(data+2+i, (void *)&payload_len+(len_size-i-1), 1);
+		}
+	}
+	memcpy(data+payload_offset, in_data, datalen);
+	sent = 0;
+
+	while(sent < frame_size) {
+		sent += send(sockfd, data+sent, frame_size - sent, 0);
+	}
+	free(data);
+	return sent;
+}
+
 int libwebsock_send_text(int sockfd, char *strdata)  {
 	if(strdata == NULL) {
 		fprintf(stderr, "Will not send empty message.\n");
@@ -99,7 +158,7 @@ int libwebsock_send_text(int sockfd, char *strdata)  {
 		sent += send(sockfd, data+sent, frame_size - sent, 0);
 	}
 	free(data);
-	return 1;
+	return sent;
 }
 
 //used for debugging purposes
