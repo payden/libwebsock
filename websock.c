@@ -22,7 +22,6 @@ void libwebsock_wait(libwebsock_context *ctx) {
 				//accepting new connection.
 				new_fd = accept(ctx->listen_fd, (struct sockaddr *)&theiraddr, &sin_size);
 				if(new_fd != -1) {
-					fprintf(stderr, "DEBUG: Accepted new connection, performing handshake.\n");
 					libwebsock_handshake(ctx, new_fd);	
 				}
 			}
@@ -252,6 +251,11 @@ void libwebsock_handle_control_frame(libwebsock_context *ctx, libwebsock_client_
 	ctl_frame->prev_frame = ptr;
 	ctl_frame->rawdata = (char *)malloc(FRAME_CHUNK_LENGTH);
 	memset(ctl_frame->rawdata, 0, FRAME_CHUNK_LENGTH);
+}
+
+int libwebsock_default_connect_callback(libwebsock_client_state *state) {
+	fprintf(stderr, "New connection with socket descriptor: %d\n", state->sockfd);
+	return 0;
 }
 
 int libwebsock_default_receive_callback(libwebsock_client_state *state, libwebsock_message *msg) {
@@ -538,6 +542,7 @@ libwebsock_context *libwebsock_init(char *port) {
 	memset(ctx, 0, sizeof(libwebsock_context));
 	strncpy(ctx->port, port, PORT_STRLEN);
 
+	libwebsock_set_connect_cb(ctx, &libwebsock_default_connect_callback);
 	libwebsock_set_control_cb(ctx, &libwebsock_default_control_callback);
 	libwebsock_set_receive_cb(ctx, &libwebsock_default_receive_callback);
 

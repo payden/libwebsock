@@ -53,6 +53,7 @@ typedef struct _libwebsock_context {
 int libwebsock_send_binary(int sockfd, char *in_data, unsigned long long datalen);
 int libwebsock_send_text(int sockfd, char *strdata);
 int libwebsock_complete_frame(libwebsock_frame *frame);
+int libwebsock_default_connect_callback(libwebsock_client_state *state);
 int libwebsock_default_receive_callback(libwebsock_client_state *state, libwebsock_message *msg);
 int libwebsock_default_control_callback(libwebsock_client_state *state, libwebsock_frame *ctl_frame);
 void libwebsock_shutdown(libwebsock_context *ctx);
@@ -66,5 +67,5 @@ void libwebsock_wait(libwebsock_context *ctx);
 void libwebsock_handshake(libwebsock_context *ctx, int sockfd);
 void libwebsock_set_receive_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state*, libwebsock_message *msg));
 void libwebsock_set_receive_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state*, libwebsock_message *msg));
-void libwebsock_set_connect_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state *state))
+void libwebsock_set_connect_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state *state));
 libwebsock_context *libwebsock_init(char *port);
