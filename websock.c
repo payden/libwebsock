@@ -503,6 +503,13 @@ void libwebsock_handshake(libwebsock_context *ctx, int sockfd) {
 	ev.data.ptr = state;
 	ev.events = EPOLLIN;
 	epoll_ctl(ctx->epoll_fd, EPOLL_CTL_ADD, sockfd, &ev);
+	if(ctx->connect_callback != NULL) {
+		ctx->connect_callback(state);
+	}
+}
+
+void libwebsock_set_connect_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state *state)) {
+	ctx->connect_callback = cb;
 }
 
 void libwebsock_set_receive_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state *state, libwebsock_message* msg)) {

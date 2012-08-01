@@ -39,6 +39,7 @@ typedef struct _libwebsock_context {
 	int epoll_fd;
 	int (*receive_callback)(libwebsock_client_state*, libwebsock_message*);
 	int (*control_callback)(libwebsock_client_state*, libwebsock_frame*);
+	int (*connect_callback)(libwebsock_client_state*);
 	char port[PORT_STRLEN];
 	struct epoll_event *events;
 } libwebsock_context;
@@ -64,4 +65,6 @@ void libwebsock_handle_client_event(libwebsock_context *ctx, libwebsock_client_s
 void libwebsock_wait(libwebsock_context *ctx);
 void libwebsock_handshake(libwebsock_context *ctx, int sockfd);
 void libwebsock_set_receive_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state*, libwebsock_message *msg));
+void libwebsock_set_receive_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state*, libwebsock_message *msg));
+void libwebsock_set_connect_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state *state))
 libwebsock_context *libwebsock_init(char *port);
