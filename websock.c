@@ -433,8 +433,9 @@ void libwebsock_handshake(libwebsock_context *ctx, int sockfd) {
 	//probably shouldn't have a static size for handshake buffer, maybe some better programmers can learn me in this.
 	char buf[1024];
 	char sha1buf[45];
+	char concat[1024];
 	unsigned char sha1mac[20];
-	char *concat = NULL;
+	char *tok = NULL, *headers = NULL, *key = NULL;
 	char *base64buf = NULL;
 	const char *GID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 	struct epoll_event ev;
@@ -447,13 +448,16 @@ void libwebsock_handshake(libwebsock_context *ctx, int sockfd) {
 	int endheader = 0;
 	while(endheader == 0) {
 		n = recv(sockfd, &buf[x], 1023, 0);
+		if(n == 0) {
+			fprintf(stderr, "Client exited during before handshake completed.\n");
+			return;
+		}
 		if(strcmp(&buf[x+(n-4)], "\r\n\r\n") == 0) {
 			endheader = 1;
 		}
 		x += n;
 	}
 	
-	char *tok = NULL, *headers = NULL, *key = NULL;
 	headers = (char *)malloc(1024);
 	if(!headers) {
 		fprintf(stderr, "Unable to allocate memory in libwebsock_handshake..\n");
@@ -476,14 +480,14 @@ void libwebsock_handshake(libwebsock_context *ctx, int sockfd) {
 		return;
 	}
 
-	concat = (char *)malloc(strlen(GID) + strlen(key) + 1);
-	strncpy(concat, key, strlen(key));
+
+	memset(concat, 0, sizeof(concat));
+	strncat(concat, key, strlen(key));
 	strncat(concat, GID, strlen(GID));
 	SHA1Input(&shactx, (unsigned char *)concat, strlen(concat));
 	SHA1Result(&shactx);
-	free(concat);
 	free(key);
-	key = concat = NULL;
+	key = NULL;
 	sprintf(sha1buf, "%08x%08x%08x%08x%08x", shactx.Message_Digest[0], shactx.Message_Digest[1], shactx.Message_Digest[2], shactx.Message_Digest[3], shactx.Message_Digest[4]);
 	for(n = 0; n < (strlen(sha1buf)/2);n++)
 		sscanf(sha1buf+(n*2), "%02hhx", sha1mac+n);
