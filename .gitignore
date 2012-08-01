@@ -35,7 +35,8 @@ Makefile.in
 /config/
 /configure
 *~
+m4/*.m4
 /build*/
-m4
+ltmain.sh
 libtool
 libwebsock.la

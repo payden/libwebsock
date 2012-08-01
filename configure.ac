@@ -1,7 +1,7 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
-AC_PREREQ([2.68])
+AC_PREREQ([2.60])
 AC_INIT([libwebsock], [1.0.1], [payden@paydensutherland.com])
 AM_INIT_AUTOMAKE
 LT_INIT([disable-static])
