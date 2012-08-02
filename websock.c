@@ -29,6 +29,9 @@ void libwebsock_wait(libwebsock_context *ctx) {
 				client_state = (libwebsock_client_state *)ctx->events[i].data.ptr;
 				libwebsock_handle_client_event(ctx, client_state);
 				if(client_state->should_close == 1) {
+					if(ctx->close_callback != NULL) {
+						ctx->close_callback(client_state);
+					}
 					close(client_state->sockfd);
 					free(client_state);
 					client_state = NULL;
@@ -207,7 +210,9 @@ void libwebsock_handle_client_event(libwebsock_context *ctx, libwebsock_client_s
 	memset(buf, 0, 1024);
 	n = recv(state->sockfd, buf, 1023, 0);
 	if(n == 0) {
-		fprintf(stderr, "Client closed connection.\n");
+		if(ctx->close_callback != NULL) {
+			ctx->close_callback(state);
+		}
 		libwebsock_free_all_frames(state);
 		close(state->sockfd);
 		free(state);
@@ -251,6 +256,11 @@ void libwebsock_handle_control_frame(libwebsock_context *ctx, libwebsock_client_
 	ctl_frame->prev_frame = ptr;
 	ctl_frame->rawdata = (char *)malloc(FRAME_CHUNK_LENGTH);
 	memset(ctl_frame->rawdata, 0, FRAME_CHUNK_LENGTH);
+}
+
+int libwebsock_default_close_callback(libwebsock_client_state *state) {
+	fprintf(stderr, "Closing connection with socket descriptor: %d\n", state->sockfd);
+	return 0;
 }
 
 int libwebsock_default_connect_callback(libwebsock_client_state *state) {
@@ -512,6 +522,10 @@ void libwebsock_handshake(libwebsock_context *ctx, int sockfd) {
 	}
 }
 
+void libwebsock_set_close_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state *state)) {
+	ctx->close_callback = cb;
+}
+
 void libwebsock_set_connect_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state *state)) {
 	ctx->connect_callback = cb;
 }
@@ -542,6 +556,7 @@ libwebsock_context *libwebsock_init(char *port) {
 	memset(ctx, 0, sizeof(libwebsock_context));
 	strncpy(ctx->port, port, PORT_STRLEN);
 
+	libwebsock_set_close_cb(ctx, &libwebsock_default_close_callback);
 	libwebsock_set_connect_cb(ctx, &libwebsock_default_connect_callback);
 	libwebsock_set_control_cb(ctx, &libwebsock_default_control_callback);
 	libwebsock_set_receive_cb(ctx, &libwebsock_default_receive_callback);

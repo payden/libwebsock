@@ -31,6 +31,7 @@ typedef struct _libwebsock_client_state {
 	int sockfd;
 	int sent_close_frame;
 	int should_close;
+	void *data;
 	libwebsock_frame *current_frame;
 } libwebsock_client_state;
 
@@ -40,6 +41,7 @@ typedef struct _libwebsock_context {
 	int (*receive_callback)(libwebsock_client_state*, libwebsock_message*);
 	int (*control_callback)(libwebsock_client_state*, libwebsock_frame*);
 	int (*connect_callback)(libwebsock_client_state*);
+	int (*close_callback)(libwebsock_client_state*);
 	char port[PORT_STRLEN];
 	struct epoll_event *events;
 } libwebsock_context;
@@ -53,6 +55,7 @@ typedef struct _libwebsock_context {
 int libwebsock_send_binary(int sockfd, char *in_data, unsigned long long datalen);
 int libwebsock_send_text(int sockfd, char *strdata);
 int libwebsock_complete_frame(libwebsock_frame *frame);
+int libwebsock_default_close_callback(libwebsock_client_state *state);
 int libwebsock_default_connect_callback(libwebsock_client_state *state);
 int libwebsock_default_receive_callback(libwebsock_client_state *state, libwebsock_message *msg);
 int libwebsock_default_control_callback(libwebsock_client_state *state, libwebsock_frame *ctl_frame);
@@ -65,6 +68,7 @@ void libwebsock_handle_recv(libwebsock_context *ctx, libwebsock_client_state *st
 void libwebsock_handle_client_event(libwebsock_context *ctx, libwebsock_client_state *state);
 void libwebsock_wait(libwebsock_context *ctx);
 void libwebsock_handshake(libwebsock_context *ctx, int sockfd);
+void libwebsock_set_close_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state*));
 void libwebsock_set_receive_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state*, libwebsock_message *msg));
 void libwebsock_set_receive_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state*, libwebsock_message *msg));
 void libwebsock_set_connect_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state *state));
