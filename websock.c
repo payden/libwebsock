@@ -368,7 +368,6 @@ void libwebsock_dispatch_message(libwebsock_context *ctx, libwebsock_client_stat
 	memset(message_payload, 0, message_payload_len + 1);
 	for(;current != NULL; current = current->next_frame) {
 		for(i = 0; i < current->payload_len; i++) {
-			//demask frame payload
 			*(current->rawdata + current->payload_offset + i) ^= (current->mask[i % 4] & 0xff);
 		}
 		memcpy(message_payload + message_offset, current->rawdata + current->payload_offset, current->payload_len);
