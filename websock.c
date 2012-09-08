@@ -13,6 +13,7 @@
 
 void libwebsock_wait(libwebsock_context *ctx) {
 	int ret, i, new_fd;
+	struct epoll_event ev;
 	socklen_t sin_size;
 	libwebsock_client_state *client_state = NULL;
 	struct sockaddr_storage theiraddr;
@@ -22,7 +23,24 @@ void libwebsock_wait(libwebsock_context *ctx) {
 				//accepting new connection.
 				new_fd = accept(ctx->listen_fd, (struct sockaddr *)&theiraddr, &sin_size);
 				if(new_fd != -1) {
-					libwebsock_handshake(ctx, new_fd);	
+					client_state = (libwebsock_client_state *)malloc(sizeof(libwebsock_client_state));
+					if(!client_state) {
+						fprintf(stderr, "Unable to allocate memory for new connection state structure.\n");
+						close(new_fd);
+						return;
+					}
+					memset(client_state, 0, sizeof(libwebsock_client_state));
+					client_state->connecting = 1;
+					client_state->sockfd = new_fd;
+					ev.events = EPOLLIN;
+					ev.data.ptr = client_state;
+					if(epoll_ctl(ctx->epoll_fd, EPOLL_CTL_ADD, new_fd, &ev) == -1) {
+						fprintf(stderr, "Unable to add new socket (%d) to epoll\n", new_fd);
+						close(new_fd);
+						if(client_state) {
+							free(client_state);
+						}
+					}
 				}
 			}
 			else {
@@ -209,6 +227,10 @@ void libwebsock_handle_client_event(libwebsock_context *ctx, libwebsock_client_s
 	int n;
 	memset(buf, 0, 1024);
 	n = recv(state->sockfd, buf, 1023, 0);
+	if(n == -1) {
+		fprintf(stderr, "Error occurred during receive in libwebsock_handle_client_event.\n");
+		return;
+	}
 	if(n == 0) {
 		if(ctx->close_callback != NULL) {
 			ctx->close_callback(state);
@@ -219,13 +241,17 @@ void libwebsock_handle_client_event(libwebsock_context *ctx, libwebsock_client_s
 		return;
 	}
 	newdata = (char *)malloc(n+1);
-	if(!newdata) {
+	if(newdata == NULL) {
 		fprintf(stderr, "Unable to allocate memory in libwebsock_handle_client_event\n");
 		exit(1);
 	}
 	memset(newdata, 0, n+1);
 	memcpy(newdata, buf, n);
-	libwebsock_handle_recv(ctx, state, newdata, n);
+	if(state->connecting) {
+		libwebsock_handshake(ctx, state, newdata, n);
+	} else {
+		libwebsock_handle_recv(ctx, state, newdata, n);
+	}
 
 }
 
@@ -442,8 +468,8 @@ int libwebsock_complete_frame(libwebsock_frame *frame) {
 	return 1;
 }
 
-void libwebsock_handshake(libwebsock_context *ctx, int sockfd) {
-	//probably shouldn't have a static size for handshake buffer, maybe some better programmers can learn me in this.
+void libwebsock_handshake_finish(libwebsock_context *ctx, libwebsock_client_state *state) {
+	libwebsock_string *str = state->data;
 	char buf[1024];
 	char sha1buf[45];
 	char concat[1024];
@@ -452,32 +478,20 @@ void libwebsock_handshake(libwebsock_context *ctx, int sockfd) {
 	char *base64buf = NULL;
 	const char *GID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 	struct epoll_event ev;
-	libwebsock_client_state *state = NULL;
+	int sockfd = state->sockfd;
 	SHA1Context shactx;
 	SHA1Reset(&shactx);
-	memset(buf, 0, 1024);
 	int n = 0;
 	int x = 0;
-	int endheader = 0;
-	while(endheader == 0) {
-		n = recv(sockfd, &buf[x], 1023, 0);
-		if(n == 0) {
-			fprintf(stderr, "Client exited during before handshake completed.\n");
-			return;
-		}
-		if(strcmp(&buf[x+(n-4)], "\r\n\r\n") == 0) {
-			endheader = 1;
-		}
-		x += n;
-	}
 	
-	headers = (char *)malloc(1024);
+	headers = (char *)malloc(str->data_sz);
 	if(!headers) {
 		fprintf(stderr, "Unable to allocate memory in libwebsock_handshake..\n");
 		close(sockfd);
 		return;
 	}
-	strncpy(headers, buf, 1023);
+	memset(headers, 0, str->data_sz);
+	strncpy(headers, str->data, str->idx);
 	for(tok = strtok(headers, "\r\n"); tok != NULL; tok = strtok(NULL, "\r\n")) {
 		if(strstr(tok, "Sec-WebSocket-Key: ") != NULL) {
 			key = (char *)malloc(strlen(tok));
@@ -489,7 +503,7 @@ void libwebsock_handshake(libwebsock_context *ctx, int sockfd) {
 	
 	if(key == NULL) {
 		fprintf(stderr, "Unable to find key in request headers.\n");
-		close(sockfd);
+		state->should_close = 1;
 		return;
 	}
 
@@ -508,16 +522,56 @@ void libwebsock_handshake(libwebsock_context *ctx, int sockfd) {
 	base64_encode(sha1mac, 20, base64buf, 256);
 	memset(buf, 0, 1024);
 	snprintf(buf, 1024, "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: %s\r\n\r\n", base64buf);
-	for(n = 0; n < strlen(buf);)
-		n += send(sockfd, buf+n, strlen(buf+n), 0);
-	state = (libwebsock_client_state *)malloc(sizeof(libwebsock_client_state));
-	memset(state, 0, sizeof(libwebsock_client_state));
-	state->sockfd = sockfd;
-	ev.data.ptr = state;
-	ev.events = EPOLLIN;
-	epoll_ctl(ctx->epoll_fd, EPOLL_CTL_ADD, sockfd, &ev);
+	for(n = 0; n < strlen(buf);) {
+		x = send(sockfd, buf+n, strlen(buf+n), 0);
+		if(x == -1)
+			break;
+		n += x;
+	}
+
+	state->connecting = 0;
+
 	if(ctx->connect_callback != NULL) {
 		ctx->connect_callback(state);
+	}
+}
+
+void libwebsock_handshake(libwebsock_context *ctx, libwebsock_client_state *state, char *data, int datalen) {
+	libwebsock_string *str = NULL;
+	str = state->data;
+	if(!str) {
+		state->data = (libwebsock_string *)malloc(sizeof(libwebsock_string));
+		if(!state->data) {
+			fprintf(stderr, "Unable to allocate memory in libwebsock_handshake.\n");
+			state->should_close = 1;
+			return;
+		}
+		str = state->data;
+		memset(str, 0, sizeof(libwebsock_string));
+		str->data_sz = FRAME_CHUNK_LENGTH;
+		str->data = (char *)malloc(str->data_sz);
+		if(!str->data) {
+			fprintf(stderr, "Unable to allocate memory in libwebsock_handshake.\n");
+			state->should_close = 1;
+			return;
+		}
+		memset(str->data, 0, str->data_sz);
+	}
+
+	if(str->idx + datalen + 1 >= str->data_sz) {
+		str->data = realloc(str->data, str->data_sz + FRAME_CHUNK_LENGTH);
+		if(!str->data) {
+			fprintf(stderr, "Failed realloc.\n");
+			state->should_close = 1;
+			return;
+		}
+		str->data_sz += FRAME_CHUNK_LENGTH;
+		memset(str->data + str->idx, 0, str->data_sz - str->idx);
+	}
+	memcpy(str->data + str->idx, data, datalen);
+	str->idx += datalen;
+	if(strstr(str->data, "\r\n\r\n") != NULL) {
+		libwebsock_handshake_finish(ctx, state);
 	}
 }
 

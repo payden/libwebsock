@@ -6,6 +6,12 @@
 #define FRAME_CHUNK_LENGTH 1024
 #define MASK_LENGTH 4
 
+typedef struct _libwebsock_string {
+	char *data;
+	int length;
+	int idx;
+	int data_sz;
+} libwebsock_string;
 
 typedef struct _libwebsock_frame {
 	unsigned int fin;
@@ -31,6 +37,8 @@ typedef struct _libwebsock_client_state {
 	int sockfd;
 	int sent_close_frame;
 	int should_close;
+	int connecting;
+	//need to throw these flags in a single flags variable
 	void *data;
 	libwebsock_frame *current_frame;
 } libwebsock_client_state;
@@ -67,7 +75,8 @@ void libwebsock_dump_frame(libwebsock_frame *frame);
 void libwebsock_handle_recv(libwebsock_context *ctx, libwebsock_client_state *state, char *data, int datalen);
 void libwebsock_handle_client_event(libwebsock_context *ctx, libwebsock_client_state *state);
 void libwebsock_wait(libwebsock_context *ctx);
-void libwebsock_handshake(libwebsock_context *ctx, int sockfd);
+void libwebsock_handshake_finish(libwebsock_context *ctx, libwebsock_client_state *state);
+void libwebsock_handshake(libwebsock_context *ctx, libwebsock_client_state *state, char *data, int datalen);
 void libwebsock_set_close_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state*));
 void libwebsock_set_receive_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state*, libwebsock_message *msg));
 void libwebsock_set_receive_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state*, libwebsock_message *msg));
