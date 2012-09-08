@@ -30,7 +30,7 @@ void libwebsock_wait(libwebsock_context *ctx) {
 						return;
 					}
 					memset(client_state, 0, sizeof(libwebsock_client_state));
-					client_state->connecting = 1;
+					client_state->flags |= STATE_CONNECTING;
 					client_state->sockfd = new_fd;
 					ev.events = EPOLLIN;
 					ev.data.ptr = client_state;
@@ -46,7 +46,7 @@ void libwebsock_wait(libwebsock_context *ctx) {
 			else {
 				client_state = (libwebsock_client_state *)ctx->events[i].data.ptr;
 				libwebsock_handle_client_event(ctx, client_state);
-				if(client_state->should_close == 1) {
+				if(client_state->flags & STATE_SHOULD_CLOSE) {
 					if(ctx->close_callback != NULL) {
 						ctx->close_callback(client_state);
 					}
@@ -68,7 +68,7 @@ int libwebsock_send_binary(int sockfd, char *in_data, unsigned long long datalen
 	unsigned long long be_payload_len;
 	unsigned int sent = 0;
 	int i;
-	size_t frame_size;
+	unsigned int frame_size;
 	char *data;
 	payload_len = datalen;
 	finNopcode = 0x82; //FIN and binary opcode.
@@ -131,7 +131,7 @@ int libwebsock_send_text(int sockfd, char *strdata)  {
 	unsigned long long be_payload_len;
 	unsigned int sent = 0;
 	int i;
-	size_t frame_size;
+	unsigned int frame_size;
 	char *data;
 	payload_len = strlen(strdata);
 	finNopcode = 0x81; //FIN and text opcode.
@@ -247,7 +247,7 @@ void libwebsock_handle_client_event(libwebsock_context *ctx, libwebsock_client_s
 	}
 	memset(newdata, 0, n+1);
 	memcpy(newdata, buf, n);
-	if(state->connecting) {
+	if(state->flags & STATE_CONNECTING) {
 		libwebsock_handshake(ctx, state, newdata, n);
 	} else {
 		libwebsock_handle_recv(ctx, state, newdata, n);
@@ -304,7 +304,7 @@ int libwebsock_default_control_callback(libwebsock_client_state *state, libwebso
 	switch(ctl_frame->opcode) {
 		case 0x8:
 			//close frame
-			if(state->sent_close_frame == 0) {
+			if((state->flags & STATE_SENT_CLOSE_FRAME) == 0) {
 				//client request close.  Send close frame as acknowledgement.
 				for(i=0;i<ctl_frame->payload_len;i++)
 					*(ctl_frame->rawdata + ctl_frame->payload_offset + i) ^= (ctl_frame->mask[i % 4] & 0xff); //demask payload
@@ -314,7 +314,7 @@ int libwebsock_default_control_callback(libwebsock_client_state *state, libwebso
 					i += send(state->sockfd, ctl_frame->rawdata + i, ctl_frame->payload_offset + ctl_frame->payload_len - i, 0);
 				}
 			}
-			state->should_close = 1;
+			state->flags |= STATE_SHOULD_CLOSE;
 			break;
 	}
 	return 1;
@@ -503,7 +503,7 @@ void libwebsock_handshake_finish(libwebsock_context *ctx, libwebsock_client_stat
 	
 	if(key == NULL) {
 		fprintf(stderr, "Unable to find key in request headers.\n");
-		state->should_close = 1;
+		state->flags |= STATE_SHOULD_CLOSE;
 		return;
 	}
 
@@ -524,12 +524,12 @@ void libwebsock_handshake_finish(libwebsock_context *ctx, libwebsock_client_stat
 	snprintf(buf, 1024, "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: %s\r\n\r\n", base64buf);
 	for(n = 0; n < strlen(buf);) {
 		x = send(sockfd, buf+n, strlen(buf+n), 0);
-		if(x == -1)
+		if(x == -1 || x == 0)
 			break;
 		n += x;
 	}
 
-	state->connecting = 0;
+	state->flags &= ~STATE_CONNECTING;
 
 	if(ctx->connect_callback != NULL) {
 		ctx->connect_callback(state);
@@ -543,7 +543,7 @@ void libwebsock_handshake(libwebsock_context *ctx, libwebsock_client_state *stat
 		state->data = (libwebsock_string *)malloc(sizeof(libwebsock_string));
 		if(!state->data) {
 			fprintf(stderr, "Unable to allocate memory in libwebsock_handshake.\n");
-			state->should_close = 1;
+			state->flags |= STATE_SHOULD_CLOSE;
 			return;
 		}
 		str = state->data;
@@ -552,7 +552,7 @@ void libwebsock_handshake(libwebsock_context *ctx, libwebsock_client_state *stat
 		str->data = (char *)malloc(str->data_sz);
 		if(!str->data) {
 			fprintf(stderr, "Unable to allocate memory in libwebsock_handshake.\n");
-			state->should_close = 1;
+			state->flags |= STATE_SHOULD_CLOSE;
 			return;
 		}
 		memset(str->data, 0, str->data_sz);
@@ -562,7 +562,7 @@ void libwebsock_handshake(libwebsock_context *ctx, libwebsock_client_state *stat
 		str->data = realloc(str->data, str->data_sz + FRAME_CHUNK_LENGTH);
 		if(!str->data) {
 			fprintf(stderr, "Failed realloc.\n");
-			state->should_close = 1;
+			state->flags |= STATE_SHOULD_CLOSE;
 			return;
 		}
 		str->data_sz += FRAME_CHUNK_LENGTH;

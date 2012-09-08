@@ -5,6 +5,9 @@
 #define LISTEN_BACKLOG 10
 #define FRAME_CHUNK_LENGTH 1024
 #define MASK_LENGTH 4
+#define STATE_SHOULD_CLOSE (1 << 0)
+#define STATE_SENT_CLOSE_FRAME (1 << 1)
+#define STATE_CONNECTING (1 << 2)
 
 typedef struct _libwebsock_string {
 	char *data;
@@ -35,9 +38,7 @@ typedef struct _libwebsock_message {
 
 typedef struct _libwebsock_client_state {
 	int sockfd;
-	int sent_close_frame;
-	int should_close;
-	int connecting;
+	int flags;
 	//need to throw these flags in a single flags variable
 	void *data;
 	libwebsock_frame *current_frame;
