@@ -5,6 +5,10 @@
 #include <sys/epoll.h>
 #include "websock.h"
 
+void libwebsock_add_ssl_port(libwebsock_context *ctx, char *port, char *certfile, char *keyfile) {
+	//stubbing out ability to listen on another port for SSL connections
+}
+
 void libwebsock_dump_frame(libwebsock_frame *frame) {
 	fprintf(stderr, "FIN: %d\n", frame->fin);
 	fprintf(stderr, "Opcode: %d\n", frame->opcode);
