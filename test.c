@@ -51,7 +51,7 @@ int main(int argc, char **argv) {
 		fprintf(stderr, "Error during libwebsock_init.\n");
 		exit(1);
 	}
-	libwebsock_bind(ctx, "192.168.0.50", "3333");
+	libwebsock_bind(ctx, "0.0.0.0", "3333");
 	libwebsock_set_receive_cb(ctx, &my_receive_callback);
 	libwebsock_wait(ctx);
 	return 0;

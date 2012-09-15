@@ -6,8 +6,8 @@
 #define FRAME_CHUNK_LENGTH 1024
 #define MASK_LENGTH 4
 
-#define CONTAINER_CLIENT_STATE 1
-#define CONTAINER_LISTENER_STATE 2
+#define EVENT_INFO_CLIENT 1
+#define EVENT_INFO_LISTENER 2
 
 #define STATE_SHOULD_CLOSE (1 << 0)
 #define STATE_SENT_CLOSE_FRAME (1 << 1)
@@ -61,10 +61,10 @@ typedef union _libwebsock_event_data {
 
 } libwebsock_event_data;
 
-typedef struct _libwebsock_event_container {
+typedef struct _libwebsock_event_info {
 	int type;
 	libwebsock_event_data data;
-} libwebsock_event_container;
+} libwebsock_event_info;
 
 typedef struct _libwebsock_context {
 	int epoll_fd;
