@@ -39,7 +39,6 @@ typedef struct _libwebsock_message {
 typedef struct _libwebsock_client_state {
 	int sockfd;
 	int flags;
-	//need to throw these flags in a single flags variable
 	void *data;
 	libwebsock_frame *current_frame;
 } libwebsock_client_state;
@@ -80,6 +79,6 @@ void libwebsock_handshake_finish(libwebsock_context *ctx, libwebsock_client_stat
 void libwebsock_handshake(libwebsock_context *ctx, libwebsock_client_state *state, char *data, int datalen);
 void libwebsock_set_close_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state*));
 void libwebsock_set_receive_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state*, libwebsock_message *msg));
-void libwebsock_set_receive_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state*, libwebsock_message *msg));
+void libwebsock_set_control_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state*, libwebsock_frame *ctl_frame));
 void libwebsock_set_connect_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state *state));
 libwebsock_context *libwebsock_init(char *port);
