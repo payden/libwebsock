@@ -5,9 +5,16 @@
 #define LISTEN_BACKLOG 10
 #define FRAME_CHUNK_LENGTH 1024
 #define MASK_LENGTH 4
+
+#define CONTAINER_CLIENT_STATE 1
+#define CONTAINER_LISTENER_STATE 2
+
 #define STATE_SHOULD_CLOSE (1 << 0)
 #define STATE_SENT_CLOSE_FRAME (1 << 1)
 #define STATE_CONNECTING (1 << 2)
+#define STATE_IS_SSL (1 << 3)
+
+#define LISTENER_STATE_IS_SSL (1 << 0)
 
 typedef struct _libwebsock_string {
 	char *data;
@@ -43,14 +50,28 @@ typedef struct _libwebsock_client_state {
 	libwebsock_frame *current_frame;
 } libwebsock_client_state;
 
+typedef struct _libwebsock_listener_state {
+	int sockfd;
+	int flags;
+} libwebsock_listener_state;
+
+typedef union _libwebsock_event_data {
+	libwebsock_client_state *client_state;
+	libwebsock_listener_state *listener_state;
+
+} libwebsock_event_data;
+
+typedef struct _libwebsock_event_container {
+	int type;
+	libwebsock_event_data data;
+} libwebsock_event_container;
+
 typedef struct _libwebsock_context {
-	int listen_fd;
 	int epoll_fd;
 	int (*receive_callback)(libwebsock_client_state*, libwebsock_message*);
 	int (*control_callback)(libwebsock_client_state*, libwebsock_frame*);
 	int (*connect_callback)(libwebsock_client_state*);
 	int (*close_callback)(libwebsock_client_state*);
-	char port[PORT_STRLEN];
 	struct epoll_event *events;
 } libwebsock_context;
 
@@ -82,4 +103,4 @@ void libwebsock_set_receive_cb(libwebsock_context *ctx, int (*cb)(libwebsock_cli
 void libwebsock_set_control_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state*, libwebsock_frame *ctl_frame));
 void libwebsock_set_connect_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state *state));
 void libwebsock_add_ssl_port(libwebsock_context *ctx, char *port, char *certfile, char *keyfile);
-libwebsock_context *libwebsock_init(char *port);
+libwebsock_context *libwebsock_init(void);

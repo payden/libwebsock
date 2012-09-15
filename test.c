@@ -46,11 +46,12 @@ int my_receive_callback(libwebsock_client_state *state, libwebsock_message *msg)
 
 int main(int argc, char **argv) {
 	libwebsock_context *ctx = NULL;
-	ctx = (libwebsock_context *)libwebsock_init("3333");
+	ctx = (libwebsock_context *)libwebsock_init();
 	if(ctx == NULL) {
 		fprintf(stderr, "Error during libwebsock_init.\n");
 		exit(1);
 	}
+	libwebsock_bind(ctx, "192.168.0.50", "3333");
 	libwebsock_set_receive_cb(ctx, &my_receive_callback);
 	libwebsock_wait(ctx);
 	return 0;
