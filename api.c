@@ -50,7 +50,7 @@ int libwebsock_send_binary(int sockfd, char *in_data, unsigned long long datalen
 		data = (void *)malloc(frame_size);
 		payload_len_small = 126;
 		payload_offset += 2;
-	} else if(payload_len > 0xffff && payload_len <= 0xffffffffffffffff) {
+	} else if(payload_len > 0xffff && payload_len <= 0xffffffffffffffffLL) {
 		frame_size = 10 + payload_len;
 		data = (void *)malloc(frame_size);
 		payload_len_small = 127;
@@ -71,7 +71,7 @@ int libwebsock_send_binary(int sockfd, char *in_data, unsigned long long datalen
 		}
 	}
 	if(payload_len_small == 127) {
-		payload_len &= 0xffffffffffffffff;
+		payload_len &= 0xffffffffffffffffLL;
 		len_size = 8;
 		for(i = 0; i < len_size; i++) {
 			memcpy(data+2+i, (void *)&payload_len+(len_size-i-1), 1);
@@ -113,7 +113,7 @@ int libwebsock_send_text(int sockfd, char *strdata)  {
 		data = (void *)malloc(frame_size);
 		payload_len_small = 126;
 		payload_offset += 2;
-	} else if(payload_len > 0xffff && payload_len <= 0xffffffffffffffff) {
+	} else if(payload_len > 0xffff && payload_len <= 0xffffffffffffffffLL) {
 		frame_size = 10 + payload_len;
 		data = (void *)malloc(frame_size);
 		payload_len_small = 127;
@@ -134,7 +134,7 @@ int libwebsock_send_text(int sockfd, char *strdata)  {
 		}
 	}
 	if(payload_len_small == 127) {
-		payload_len &= 0xffffffffffffffff;
+		payload_len &= 0xffffffffffffffffLL;
 		len_size = 8;
 		for(i = 0; i < len_size; i++) {
 			memcpy(data+2+i, (void *)&payload_len+(len_size-i-1), 1);
