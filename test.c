@@ -46,7 +46,7 @@ int my_receive_callback(libwebsock_client_state *state, libwebsock_message *msg)
 
 int main(int argc, char **argv) {
 	libwebsock_context *ctx = NULL;
-	ctx = (libwebsock_context *)libwebsock_init();
+	ctx = libwebsock_init();
 	if(ctx == NULL) {
 		fprintf(stderr, "Error during libwebsock_init.\n");
 		exit(1);

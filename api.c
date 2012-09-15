@@ -340,10 +340,10 @@ void libwebsock_set_connect_cb(libwebsock_context *ctx, int (*cb)(libwebsock_cli
 	ctx->connect_callback = cb;
 }
 
-void libwebsock_set_receive_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state *state, libwebsock_message* msg)) {
+void libwebsock_set_receive_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state *state, libwebsock_message *msg)) {
 	ctx->receive_callback = cb;
 }
 
-void libwebsock_set_control_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state *state, libwebsock_frame* ctl_frame)) {
+void libwebsock_set_control_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state *state, libwebsock_frame *ctl_frame)) {
 	ctx->control_callback = cb;
 }

@@ -1,0 +1,154 @@
+libwebsock API Documentation
+
+These docs are hastily thrown together as a temporary help to any who might
+use this library.
+
+First, I will go over a very basic echo server using libwebsock.  The echo
+server simply accepts WebSocket clients and replies to any text messages
+sent by the client with the exact same message that was sent.
+
+After installing the library (covered in INSTALL.txt), we must make sure to
+include <websock/websock.h> in our server program.
+
+The most minimalistic echo server follows:
+
+int main(int argc, char **argv) {
+	libwebsock_context *ctx = NULL;
+	ctx = libwebsock_init();
+	if(ctx == NULL) {
+		fprintf(stderr, "Error during libwebsock_init.\n");
+		exit(1);
+	}
+	libwebsock_bind(ctx, "0.0.0.0", "8080");
+	libwebsock_wait(ctx);
+}
+
+First we define a pointer to a libwebsock_context named 'ctx'.
+libwebsock_init allocates memory for the actual structure and sets
+up a basic context with some default callbacks.  We check for NULL,
+to see if libwebsock_init failed or not.  Then, we must tell libwebsock
+to bind itself to a certain IP address and port.  If your server has
+only one IP address or you want to listen on all IP addresses, just
+use "0.0.0.0" for the address.  In this instance, I've used "8080"
+as the port number.  Finally, we call libwebsock_wait supplying the context
+as a parameter and libwebsock will take over from there.
+
+The above isn't very useful if you'd like to actually like to do something
+useful with your WebSocket server.  In order to allow the programmer some
+flexibility, libwebsock allows you to set callbacks to be executed when
+certain events occur.  For example, you might receive a WebSocket message
+from one of your connected clients or you might like to perform some work
+each time a new client connects.  You can look at the simple tic-tac-toe
+game in the 'ttt' folder of the source for an example of how one might
+go about using the library.  I warn you not to use the code therein directly
+as it's fraught with incomplete error checking and was intended only as
+an example.
+
+Let's take a look at the receive callback prototype and how to register a new
+one.  The prototype for the receive callback follows:
+
+int some_callback_name(libwebsock_client_state *state, libwebsock_message *msg);
+
+So the function you define will accept a pointer to a libwebsock_client_state
+and a pointer to libwebsock_message.  When a new message is received by
+libwebsock, it generates these structures in memory and will then call
+the registered callback supplying them as arguments.
+
+Useful fields in libwebsock_client_state are int sockfd and void *data.  sockfd is the
+socket descriptor for this connection which is useful if you want to send a
+message back to this client using one of the API calls.  libwebsock_message
+has an unsigned int opcode which contains the opcode for the message.  The
+opcode is usually 1 (which means it's a text message and not binary).  It
+also has an unsigned long long payload_len and char *payload.  payload_len
+tells you how much data was actually received and payload contains the
+message received from the client as a character array.  So, let's look at the
+default receive callback which just echoes the received message.
+
+int libwebsock_default_receive_callback(libwebsock_client_state *state, libwebsock_message *msg) {
+	libwebsock_send_text(state->sockfd, msg->payload);
+	return 0;
+}
+
+This callback is taken straight out of default_callbacks.c and is what gets
+registered in libwebsock_init().  It simply calls libwebsock_send_text with
+the socket descriptor of the client to send the message to and the character
+array of the message to send.
+
+If you define your own receive callback named my_receive_callback.  
+You would then have to tell libwebsock about it before calling 
+libwebsock_wait().  You do so with libwebsock_set_receive_cb().
+libwebsock_set_receive_cb expects the context and a pointer to
+the callback function you defined.  You can see this in test.c,
+which is in the root directory of this package.
+
+There are a couple of other callbacks which are useful:
+
+The connect callback which gets fired every time a new client connects.
+
+int some_connect_cb(libwebsock_client_state *state) {
+	fprintf(stderr, "New connection with socket descriptor: %d\n", state->sockfd);
+	return 0;
+}
+
+You would register this with libwebsock_set_connect_cb(ctx, &some_connect_cb);
+
+
+The close callback which gets fired when a connected client closes the
+connection.
+
+int some_close_cb(libwebsock_client_state *state) {
+	fprintf(stderr, "Client closed connection: %d\n",state->sockfd);
+	return 0;
+}
+
+There is also a control callback which deals with handling control frames,
+but that can get a little dicey and you'd probably want to study the source
+code and RFC 6455 before tackling that one.  The default control callback
+just responds to close frames in the appropriate manner and you can view
+it in default_callbacks.c.
+
+Okay, now the rest of this is only going to be technical information about
+the functions exported by the library that can be used by your program.
+
+void libwebsock_dump_frame(libwebsock_frame *frame);
+Dumps information about the supplied libwebsock_frame to stderr.
+
+int libwebsock_send_binary(int sockfd, char *in_data, unsigned long long datalen);
+Sends a binary type message to socket descriptor sockfd of length datalen with data being in_data.
+
+int libwebsock_send_text(int sockfd, char *strdata);
+Sends a text type message to socket descriptor sockfd with text from strdata.
+
+void libwebsock_wait(libwebsock_context *ctx);
+Endless loop function that uses epoll to handle incoming data and process it
+appropriately.  This function is called last and is what makes libwebsock
+tick.
+
+void libwebsock_bind(libwebsock_context *ctx, char *listen_host, char *port);
+This function is called prior to libwebsock_wait and binds a listening
+socket to the supplied ip address and port.  It also adds this socket to
+the list of sockets that will be monitored by epoll in libwebsock_wait.
+
+libwebsock_context *libwebsock_init(void);
+This functions allocates memory for a libwebsock_context and initializes
+it with some defaults.  It registers the default callbacks to be associated
+with this context.  It calls epoll_create and stores the epoll_fd in the
+context.  It also allocates memory for the epoll event buffer which is
+pointed to by ctx->events.
+
+void libwebsock_set_close_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state *state));
+This method sets the close callback for the supplied context.  It accepts the context pointer
+and a pointer to a function to be used as the close callback.
+
+void libwebsock_set_connect_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state *state));
+This method sets the connect callback for the supplied context.  It accepts the context pointer
+and a pointer toa  function to be used as the connect callback.
+
+void libwebsock_set_receive_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state *state, libwebsock_message *msg));
+This method sets the receive callback for the supplied context.  It accepts the context pointer
+and a pointer to a function to be used as the receive callback.
+
+void libwebsock_set_control_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state *state, libwebsock_frame *ctl_frame));
+This method sets the control callback for the supplied context.  It accepts the context pointer
+and a pointer to a function to be used as the control callback.
+
