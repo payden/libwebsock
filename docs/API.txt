@@ -71,7 +71,7 @@ int libwebsock_default_receive_callback(libwebsock_client_state *state, libwebso
 
 This callback is taken straight out of default_callbacks.c and is what gets
 registered in libwebsock_init().  It simply calls libwebsock_send_text with
-the socket descriptor of the client to send the message to and the character
+the libwebsock_client_state structure of the client to send the message to and the character
 array of the message to send.
 
 If you define your own receive callback named my_receive_callback.  
