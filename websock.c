@@ -16,7 +16,6 @@ void libwebsock_handle_client_event(libwebsock_context *ctx, libwebsock_client_s
 	memset(buf, 0, 1024);
 	if(state->flags & STATE_IS_SSL) {
 		n = SSL_read(state->ssl, buf, 1023);
-		fprintf(stderr, "SSL_read: %d, ssl_error: %d\n", n, SSL_get_error(state->ssl, n));
 
 	} else {
 		n = recv(state->sockfd, buf, 1023, 0);

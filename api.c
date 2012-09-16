@@ -208,7 +208,6 @@ void libwebsock_wait(libwebsock_context *ctx) {
 							free(client_state);
 							continue;
 						}
-						fprintf(stderr, "Successfully accepted SSL connection.\n");
 
 					}
 					client_state->flags |= STATE_CONNECTING;
