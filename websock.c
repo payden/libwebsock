@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/epoll.h>
+#include <openssl/ssl.h>
 
 #include "websock.h"
 #include "sha1.h"
@@ -13,7 +14,13 @@ void libwebsock_handle_client_event(libwebsock_context *ctx, libwebsock_client_s
 	char *newdata = NULL;
 	int n;
 	memset(buf, 0, 1024);
-	n = recv(state->sockfd, buf, 1023, 0);
+	if(state->flags & STATE_IS_SSL) {
+		n = SSL_read(state->ssl, buf, 1023);
+		fprintf(stderr, "SSL_read: %d, ssl_error: %d\n", n, SSL_get_error(state->ssl, n));
+
+	} else {
+		n = recv(state->sockfd, buf, 1023, 0);
+	}
 	if(n == -1) {
 		fprintf(stderr, "Error occurred during receive in libwebsock_handle_client_event.\n");
 		return;
@@ -23,6 +30,10 @@ void libwebsock_handle_client_event(libwebsock_context *ctx, libwebsock_client_s
 			ctx->close_callback(state);
 		}
 		libwebsock_free_all_frames(state);
+		if(state->flags & STATE_IS_SSL) {
+			SSL_shutdown(state->ssl);
+			SSL_free(state->ssl);
+		}
 		close(state->sockfd);
 		free(state);
 		return;
@@ -153,7 +164,11 @@ void libwebsock_handshake_finish(libwebsock_context *ctx, libwebsock_client_stat
 	memset(buf, 0, 1024);
 	snprintf(buf, 1024, "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: %s\r\n\r\n", base64buf);
 	for(n = 0; n < strlen(buf);) {
-		x = send(sockfd, buf+n, strlen(buf+n), 0);
+		if(state->flags & STATE_IS_SSL) {
+			x = SSL_write(state->ssl, buf+n, strlen(buf+n));
+		} else {
+			x = send(sockfd, buf+n, strlen(buf+n), 0);
+		}
 		if(x == -1 || x == 0)
 			break;
 		n += x;

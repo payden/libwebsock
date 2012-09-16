@@ -1,4 +1,5 @@
 //libwebsock Copyright 2012 Payden Sutherland
+#include <openssl/ssl.h>
 
 #define EPOLL_EVENTS 100
 #define PORT_STRLEN 12
@@ -48,6 +49,7 @@ typedef struct _libwebsock_client_state {
 	int flags;
 	void *data;
 	libwebsock_frame *current_frame;
+	SSL *ssl;
 } libwebsock_client_state;
 
 typedef struct _libwebsock_listener_state {
@@ -73,6 +75,7 @@ typedef struct _libwebsock_context {
 	int (*connect_callback)(libwebsock_client_state*);
 	int (*close_callback)(libwebsock_client_state*);
 	struct epoll_event *events;
+	SSL_CTX *ssl_ctx;
 } libwebsock_context;
 
 
@@ -81,8 +84,8 @@ typedef struct _libwebsock_context {
 
 //function defs
 
-int libwebsock_send_binary(int sockfd, char *in_data, unsigned long long datalen);
-int libwebsock_send_text(int sockfd, char *strdata);
+int libwebsock_send_binary(libwebsock_client_state *state, char *in_data, unsigned long long datalen);
+int libwebsock_send_text(libwebsock_client_state *state, char *strdata);
 int libwebsock_complete_frame(libwebsock_frame *frame);
 int libwebsock_default_close_callback(libwebsock_client_state *state);
 int libwebsock_default_connect_callback(libwebsock_client_state *state);

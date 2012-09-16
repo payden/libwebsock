@@ -41,7 +41,7 @@ int my_receive_callback(libwebsock_client_state *state, libwebsock_message *msg)
 	printf("Payload Length: %llu\n", msg->payload_len);
 	printf("Payload: %s\n", msg->payload);
 	//now let's send it back.
-	libwebsock_send_text(state->sockfd, msg->payload);
+	libwebsock_send_text(state, msg->payload);
 }
 
 int main(int argc, char **argv) {
@@ -52,6 +52,7 @@ int main(int argc, char **argv) {
 		exit(1);
 	}
 	libwebsock_bind(ctx, "0.0.0.0", "3333");
+	libwebsock_bind_ssl(ctx, "0.0.0.0", "8080", "server.key", "server.pem");
 	libwebsock_set_receive_cb(ctx, &my_receive_callback);
 	libwebsock_wait(ctx);
 	return 0;

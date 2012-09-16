@@ -14,7 +14,7 @@ int libwebsock_default_connect_callback(libwebsock_client_state *state) {
 }
 
 int libwebsock_default_receive_callback(libwebsock_client_state *state, libwebsock_message *msg) {
-	libwebsock_send_text(state->sockfd, msg->payload);
+	libwebsock_send_text(state, msg->payload);
 	return 0;
 }
 
@@ -30,7 +30,11 @@ int libwebsock_default_control_callback(libwebsock_client_state *state, libwebso
 				*(ctl_frame->rawdata + 1) &= 0x7f; //strip mask bit
 				i = 0;
 				while(i < ctl_frame->payload_offset + ctl_frame->payload_len) {
-					i += send(state->sockfd, ctl_frame->rawdata + i, ctl_frame->payload_offset + ctl_frame->payload_len - i, 0);
+					if(state->flags & STATE_IS_SSL) {
+						i += SSL_write(state->ssl, ctl_frame->rawdata + i, ctl_frame->payload_offset + ctl_frame->payload_len - i);
+					} else {
+						i += send(state->sockfd, ctl_frame->rawdata + i, ctl_frame->payload_offset + ctl_frame->payload_len - i, 0);
+					}
 				}
 			}
 			state->flags |= STATE_SHOULD_CLOSE;

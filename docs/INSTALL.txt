@@ -1,0 +1,12 @@
+To install websock, you will need libtool, autoconf, and automake.
+
+Just run ./autogen.sh in the root directory of the page.
+
+After running autogen.sh, if no errors are reported, you should be able to:
+
+./configure && make && sudo make install
+
+To use the library you must link against libwebsock and ssl.  For example,
+to compile the test.c program in the root.
+
+gcc test.c -o test -lwebsock -lssl

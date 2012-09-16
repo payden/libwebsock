@@ -65,7 +65,7 @@ message received from the client as a character array.  So, let's look at the
 default receive callback which just echoes the received message.
 
 int libwebsock_default_receive_callback(libwebsock_client_state *state, libwebsock_message *msg) {
-	libwebsock_send_text(state->sockfd, msg->payload);
+	libwebsock_send_text(state, msg->payload);
 	return 0;
 }
 
@@ -113,10 +113,10 @@ the functions exported by the library that can be used by your program.
 void libwebsock_dump_frame(libwebsock_frame *frame);
 Dumps information about the supplied libwebsock_frame to stderr.
 
-int libwebsock_send_binary(int sockfd, char *in_data, unsigned long long datalen);
+int libwebsock_send_binary(libwebsock_client_state *state, char *in_data, unsigned long long datalen);
 Sends a binary type message to socket descriptor sockfd of length datalen with data being in_data.
 
-int libwebsock_send_text(int sockfd, char *strdata);
+int libwebsock_send_text(libwebsock_client_state *state, char *strdata);
 Sends a text type message to socket descriptor sockfd with text from strdata.
 
 void libwebsock_wait(libwebsock_context *ctx);
@@ -128,6 +128,14 @@ void libwebsock_bind(libwebsock_context *ctx, char *listen_host, char *port);
 This function is called prior to libwebsock_wait and binds a listening
 socket to the supplied ip address and port.  It also adds this socket to
 the list of sockets that will be monitored by epoll in libwebsock_wait.
+
+void libwebsock_bind_ssl(libwebsock_context *ctx, char *listen_host,
+			  char *port, char *keyfile, char *certfile);
+This function is called prior to libwebsock_wait and binds a listening
+socket to the supplied ip address and port.  It also adds this socket
+to the list of sockets that will be monitored by epoll in libwebsock_wait.
+This function also flags the listener as SSL enabled and only SSL
+clients should connect to this port.
 
 libwebsock_context *libwebsock_init(void);
 This functions allocates memory for a libwebsock_context and initializes
