@@ -60,9 +60,47 @@ void libwebsock_handle_recv(libwebsock_context *ctx, libwebsock_client_state *st
 	//possible states right now:
 	// 1.) we're receiving the beginning of a new frame
 	// 2.) we're receiving more data from a frame that was created previously and was not complete
+	libwebsock_frame *current = NULL, *new = NULL;
+	unsigned char payload_len_short;
 	int i;
+	char byte;
 	for(i=0;i<datalen;i++) {
-		libwebsock_in_data(ctx, state, *(data+i));
+		byte = *(data+i);
+		if(state->current_frame == NULL) {
+			state->current_frame = (libwebsock_frame *)malloc(sizeof(libwebsock_frame));
+			memset(state->current_frame, 0, sizeof(libwebsock_frame));
+			state->current_frame->payload_len = -1;
+			state->current_frame->rawdata_sz = FRAME_CHUNK_LENGTH;
+			state->current_frame->rawdata = (char *)malloc(state->current_frame->rawdata_sz);
+			memset(state->current_frame->rawdata, 0, state->current_frame->rawdata_sz);
+		}
+		current = state->current_frame;
+		if(current->rawdata_idx >= current->rawdata_sz) {
+			current->rawdata_sz += FRAME_CHUNK_LENGTH;
+			current->rawdata = (char *)realloc(current->rawdata, current->rawdata_sz);
+			memset(current->rawdata + current->rawdata_idx, 0, current->rawdata_sz - current->rawdata_idx);
+		}
+		*(current->rawdata + current->rawdata_idx++) = byte;
+		if(libwebsock_complete_frame(current) == 1) {
+			if(current->fin == 1) {
+				//is control frame
+				if((current->opcode & 0x08) == 0x08) {
+					libwebsock_handle_control_frame(ctx, state, current);
+				} else {
+					libwebsock_dispatch_message(ctx, state, current);
+					state->current_frame = NULL;
+				}
+			} else {
+				new = (libwebsock_frame *)malloc(sizeof(libwebsock_frame));
+				memset(new, 0, sizeof(libwebsock_frame));
+				new->payload_len = -1;
+				new->rawdata = (char *)malloc(FRAME_CHUNK_LENGTH);
+				memset(new->rawdata, 0, FRAME_CHUNK_LENGTH);
+				new->prev_frame = current;
+				current->next_frame = new;
+				state->current_frame = new;
+			}
+		}
 	}
 	free(data);
 

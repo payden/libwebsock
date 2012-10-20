@@ -95,7 +95,6 @@ int libwebsock_default_control_callback(libwebsock_client_state *state, libwebso
 void libwebsock_shutdown(libwebsock_context *ctx);
 void libwebsock_handle_control_frame(libwebsock_context *ctx, libwebsock_client_state *state, libwebsock_frame *ctl_frame);
 void libwebsock_dispatch_message(libwebsock_context *ctx, libwebsock_client_state *state, libwebsock_frame *current);
-void libwebsock_in_data(libwebsock_context *ctx, libwebsock_client_state *state, char byte);
 void libwebsock_dump_frame(libwebsock_frame *frame);
 void libwebsock_handle_recv(libwebsock_context *ctx, libwebsock_client_state *state, char *data, int datalen);
 void libwebsock_handle_client_event(libwebsock_context *ctx, libwebsock_client_state *state);

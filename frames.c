@@ -38,46 +38,6 @@ void libwebsock_handle_control_frame(libwebsock_context *ctx, libwebsock_client_
 	memset(ctl_frame->rawdata, 0, FRAME_CHUNK_LENGTH);
 }
 
-void libwebsock_in_data(libwebsock_context *ctx, libwebsock_client_state *state, char byte) {
-	libwebsock_frame *current = NULL, *new = NULL;
-	unsigned char payload_len_short;
-	if(state->current_frame == NULL) {
-		state->current_frame = (libwebsock_frame *)malloc(sizeof(libwebsock_frame));
-		memset(state->current_frame, 0, sizeof(libwebsock_frame));
-		state->current_frame->payload_len = -1;
-		state->current_frame->rawdata_sz = FRAME_CHUNK_LENGTH;
-		state->current_frame->rawdata = (char *)malloc(state->current_frame->rawdata_sz);
-		memset(state->current_frame->rawdata, 0, state->current_frame->rawdata_sz);
-	}
-	current = state->current_frame;
-	if(current->rawdata_idx >= current->rawdata_sz) {
-		current->rawdata_sz += FRAME_CHUNK_LENGTH;
-		current->rawdata = (char *)realloc(current->rawdata, current->rawdata_sz);
-		memset(current->rawdata + current->rawdata_idx, 0, current->rawdata_sz - current->rawdata_idx);
-	}
-	*(current->rawdata + current->rawdata_idx++) = byte;
-	if(libwebsock_complete_frame(current) == 1) {
-		if(current->fin == 1) {
-			//is control frame
-			if((current->opcode & 0x08) == 0x08) {
-				libwebsock_handle_control_frame(ctx, state, current);
-			} else {
-				libwebsock_dispatch_message(ctx, state, current);
-				state->current_frame = NULL;
-			}
-		} else {
-			new = (libwebsock_frame *)malloc(sizeof(libwebsock_frame));
-			memset(new, 0, sizeof(libwebsock_frame));
-			new->payload_len = -1;
-			new->rawdata = (char *)malloc(FRAME_CHUNK_LENGTH);
-			memset(new->rawdata, 0, FRAME_CHUNK_LENGTH);
-			new->prev_frame = current;
-			current->next_frame = new;
-			state->current_frame = new;
-		}
-	}
-}
-
 void libwebsock_cleanup_frames(libwebsock_frame *first) {
 	libwebsock_frame *this = NULL;
 	libwebsock_frame *next = first;
