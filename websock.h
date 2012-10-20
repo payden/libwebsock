@@ -49,6 +49,7 @@ typedef struct _libwebsock_client_state {
 	int flags;
 	void *data;
 	libwebsock_frame *current_frame;
+	struct sockaddr_storage *sa;
 	SSL *ssl;
 } libwebsock_client_state;
 

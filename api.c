@@ -176,8 +176,9 @@ void libwebsock_wait(libwebsock_context *ctx) {
 			if(event_info->type == EVENT_INFO_LISTENER) {
 				listener_state = (libwebsock_listener_state *)event_info->data.listener_state;
 				//accepting new connection.
-
+				sin_size = sizeof(struct sockaddr_storage);
 				new_fd = accept(listener_state->sockfd, (struct sockaddr *)&theiraddr, &sin_size);
+
 				if(new_fd != -1) {
 					new_event_info = (libwebsock_event_info *)malloc(sizeof(libwebsock_event_info));
 					if(!new_event_info) {
@@ -196,6 +197,17 @@ void libwebsock_wait(libwebsock_context *ctx) {
 					}
 					new_event_info->data.client_state = client_state;
 					memset(client_state, 0, sizeof(libwebsock_client_state));
+
+					client_state->sa = (struct sockaddr_storage *)malloc(sizeof(struct sockaddr_storage));
+					if(!client_state->sa) {
+						fprintf(stderr, "Error allocating memory for sockaddr_storage in libwebsock_wait.\n");
+						exit(1);
+					}
+					memset(client_state->sa, 0, sizeof(struct sockaddr_storage));
+					memcpy(client_state->sa, &theiraddr, sin_size);
+
+
+
 					if(listener_state->flags & LISTENER_STATE_IS_SSL) {
 						client_state->flags |= STATE_IS_SSL;
 						client_state->ssl = SSL_new(ctx->ssl_ctx);

@@ -34,6 +34,9 @@ void libwebsock_handle_client_event(libwebsock_context *ctx, libwebsock_client_s
 			SSL_free(state->ssl);
 		}
 		close(state->sockfd);
+		if(state->sa) {
+			free(state->sa);
+		}
 		free(state);
 		return;
 	}
