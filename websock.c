@@ -184,7 +184,7 @@ void libwebsock_handshake_finish(libwebsock_context *ctx, libwebsock_client_stat
 	
 	if(key == NULL) {
 		fprintf(stderr, "Unable to find key in request headers.\n");
-		state->flags |= STATE_SHOULD_CLOSE;
+		close(sockfd);
 		return;
 	}
 
@@ -228,7 +228,7 @@ void libwebsock_handshake(libwebsock_context *ctx, libwebsock_client_state *stat
 		state->data = (libwebsock_string *)malloc(sizeof(libwebsock_string));
 		if(!state->data) {
 			fprintf(stderr, "Unable to allocate memory in libwebsock_handshake.\n");
-			state->flags |= STATE_SHOULD_CLOSE;
+			close(state->sockfd);
 			return;
 		}
 		str = state->data;
@@ -237,7 +237,7 @@ void libwebsock_handshake(libwebsock_context *ctx, libwebsock_client_state *stat
 		str->data = (char *)malloc(str->data_sz);
 		if(!str->data) {
 			fprintf(stderr, "Unable to allocate memory in libwebsock_handshake.\n");
-			state->flags |= STATE_SHOULD_CLOSE;
+			close(state->sockfd);
 			return;
 		}
 		memset(str->data, 0, str->data_sz);
@@ -247,7 +247,7 @@ void libwebsock_handshake(libwebsock_context *ctx, libwebsock_client_state *stat
 		str->data = realloc(str->data, str->data_sz + FRAME_CHUNK_LENGTH);
 		if(!str->data) {
 			fprintf(stderr, "Failed realloc.\n");
-			state->flags |= STATE_SHOULD_CLOSE;
+			close(state->sockfd);
 			return;
 		}
 		str->data_sz += FRAME_CHUNK_LENGTH;
