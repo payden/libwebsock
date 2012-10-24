@@ -169,96 +169,109 @@ void libwebsock_wait(libwebsock_context *ctx) {
 	libwebsock_event_info *event_info = NULL;
 	libwebsock_event_info *new_event_info = NULL;
 	struct sockaddr_storage theiraddr;
-	while((ret = epoll_wait(ctx->epoll_fd, ctx->events, EPOLL_EVENTS, 1000)) >= 0) {
-		for(i = 0; i < ret; i++) {
-			event_info = ctx->events[i].data.ptr;
+	ctx->running = 1;
+	while(ctx->running) {
+		if((ret = epoll_wait(ctx->epoll_fd, ctx->events, EPOLL_EVENTS, 1000)) >= 0) {
+			for(i = 0; i < ret; i++) {
+				event_info = ctx->events[i].data.ptr;
 
-			if(event_info->type == EVENT_INFO_LISTENER) {
-				listener_state = (libwebsock_listener_state *)event_info->data.listener_state;
-				//accepting new connection.
-				sin_size = sizeof(struct sockaddr_storage);
-				new_fd = accept(listener_state->sockfd, (struct sockaddr *)&theiraddr, &sin_size);
+				if(event_info->type == EVENT_INFO_LISTENER) {
+					listener_state = (libwebsock_listener_state *)event_info->data.listener_state;
+					//accepting new connection.
+					sin_size = sizeof(struct sockaddr_storage);
+					new_fd = accept(listener_state->sockfd, (struct sockaddr *)&theiraddr, &sin_size);
 
-				if(new_fd != -1) {
-					new_event_info = (libwebsock_event_info *)malloc(sizeof(libwebsock_event_info));
-					if(!new_event_info) {
-						fprintf(stderr, "Unable to allocate memory for new event container.\n");
-						close(new_fd);
-						return;
-					}
-					memset(new_event_info, 0, sizeof(libwebsock_event_info));
-					new_event_info->type = EVENT_INFO_CLIENT;
-					client_state = (libwebsock_client_state *)malloc(sizeof(libwebsock_client_state));
-					if(!client_state) {
-						fprintf(stderr, "Unable to allocate memory for new connection state structure.\n");
-						free(new_event_info);
-						close(new_fd);
-						return;
-					}
-					new_event_info->data.client_state = client_state;
-					memset(client_state, 0, sizeof(libwebsock_client_state));
-
-					client_state->sa = (struct sockaddr_storage *)malloc(sizeof(struct sockaddr_storage));
-					if(!client_state->sa) {
-						fprintf(stderr, "Error allocating memory for sockaddr_storage in libwebsock_wait.\n");
-						exit(1);
-					}
-					memset(client_state->sa, 0, sizeof(struct sockaddr_storage));
-					memcpy(client_state->sa, &theiraddr, sin_size);
-
-
-
-					if(listener_state->flags & LISTENER_STATE_IS_SSL) {
-						client_state->flags |= STATE_IS_SSL;
-						client_state->ssl = SSL_new(ctx->ssl_ctx);
-						SSL_set_fd(client_state->ssl, new_fd);
-						if(SSL_accept(client_state->ssl) <= 0) {
-							fprintf(stderr, "Error during SSL handshake.\n");
-							SSL_shutdown(client_state->ssl);
-							SSL_free(client_state->ssl);
+					if(new_fd != -1) {
+						new_event_info = (libwebsock_event_info *)malloc(sizeof(libwebsock_event_info));
+						if(!new_event_info) {
+							fprintf(stderr, "Unable to allocate memory for new event container.\n");
 							close(new_fd);
-							free(client_state);
-							continue;
+							return;
 						}
-
-					}
-					client_state->flags |= STATE_CONNECTING;
-					client_state->sockfd = new_fd;
-					ev.events = EPOLLIN;
-					ev.data.ptr = new_event_info;
-					if(epoll_ctl(ctx->epoll_fd, EPOLL_CTL_ADD, new_fd, &ev) == -1) {
-						fprintf(stderr, "Unable to add new socket (%d) to epoll\n", new_fd);
-						close(new_fd);
-						if(client_state) {
-							free(client_state);
-						}
-						if(new_event_info) {
+						memset(new_event_info, 0, sizeof(libwebsock_event_info));
+						new_event_info->type = EVENT_INFO_CLIENT;
+						client_state = (libwebsock_client_state *)malloc(sizeof(libwebsock_client_state));
+						if(!client_state) {
+							fprintf(stderr, "Unable to allocate memory for new connection state structure.\n");
 							free(new_event_info);
+							close(new_fd);
+							return;
+						}
+						new_event_info->data.client_state = client_state;
+						memset(client_state, 0, sizeof(libwebsock_client_state));
+
+						client_state->sa = (struct sockaddr_storage *)malloc(sizeof(struct sockaddr_storage));
+						if(!client_state->sa) {
+							fprintf(stderr, "Error allocating memory for sockaddr_storage in libwebsock_wait.\n");
+							exit(1);
+						}
+						memset(client_state->sa, 0, sizeof(struct sockaddr_storage));
+						memcpy(client_state->sa, &theiraddr, sin_size);
+
+
+
+						if(listener_state->flags & LISTENER_STATE_IS_SSL) {
+							client_state->flags |= STATE_IS_SSL;
+							client_state->ssl = SSL_new(ctx->ssl_ctx);
+							SSL_set_fd(client_state->ssl, new_fd);
+							if(SSL_accept(client_state->ssl) <= 0) {
+								fprintf(stderr, "Error during SSL handshake.\n");
+								SSL_shutdown(client_state->ssl);
+								SSL_free(client_state->ssl);
+								close(new_fd);
+								free(client_state);
+								continue;
+							}
+
+						}
+						client_state->flags |= STATE_CONNECTING;
+						client_state->sockfd = new_fd;
+						ev.events = EPOLLIN;
+						ev.data.ptr = new_event_info;
+						if(epoll_ctl(ctx->epoll_fd, EPOLL_CTL_ADD, new_fd, &ev) == -1) {
+							fprintf(stderr, "Unable to add new socket (%d) to epoll\n", new_fd);
+							close(new_fd);
+							if(client_state) {
+								free(client_state);
+							}
+							if(new_event_info) {
+								free(new_event_info);
+							}
 						}
 					}
 				}
-			}
-			else {
-				client_state = (libwebsock_client_state *)event_info->data.client_state;
+				else {
+					client_state = (libwebsock_client_state *)event_info->data.client_state;
 
-
-				libwebsock_handle_client_event(ctx, client_state);
-
-				if(client_state->flags & STATE_SHOULD_CLOSE) {
-					if(ctx->close_callback != NULL) {
-						ctx->close_callback(client_state);
-					}
-					if(client_state->flags & STATE_IS_SSL) {
-						SSL_shutdown(client_state->ssl);
-						SSL_free(client_state->ssl);
-					}
-					close(client_state->sockfd);
-					free(client_state);
-					client_state = NULL;
+					libwebsock_handle_client_event(ctx, client_state);
 				}
 			}
 		}
 	}
+	libwebsock_cleanup_context(ctx);
+}
+
+void libwebsock_cleanup_context(libwebsock_context *ctx) {
+	libwebsock_event_info *ei, *ei_next;
+	if(ctx->ssl_ctx) {
+		SSL_CTX_free(ctx->ssl_ctx);
+	}
+	if(ctx->events) {
+		free(ctx->events);
+	}
+	if(ctx->epoll_fd) {
+		close(ctx->epoll_fd);
+	}
+	ei_next = ctx->ei;
+	while(ei_next) {
+		ei = ei_next;
+		ei_next = ei->next;
+		if(ei->data.client_state) { //should be true if there is a pointer here, no matter what the type.. we don't care, we're freeing the mem.
+			free(ei->data.client_state);
+		}
+		free(ei);
+	}
+	free(ctx);
 }
 
 void libwebsock_bind_ssl(libwebsock_context *ctx, char *listen_host, char *port, char *keyfile, char *certfile) {
@@ -370,7 +383,7 @@ void libwebsock_bind_ssl(libwebsock_context *ctx, char *listen_host, char *port,
 void libwebsock_bind(libwebsock_context *ctx, char *listen_host, char *port) {
 	struct addrinfo hints, *servinfo, *p;
 	struct epoll_event ev;
-	libwebsock_event_info *event_info;
+	libwebsock_event_info *event_info, *ei_ptr;
 	libwebsock_listener_state *listener_state;
 	int sockfd, yes = 1;
 	memset(&hints, 0, sizeof(struct addrinfo));
@@ -443,6 +456,13 @@ void libwebsock_bind(libwebsock_context *ctx, char *listen_host, char *port) {
 		free(ctx);
 		exit(-1);
 	}
+	if(!ctx->ei) {
+		ctx->ei = event_info;
+	} else {
+		for(ei_ptr = ctx->ei; ei_ptr->next != NULL; ei_ptr = ei_ptr->next) {};
+		ei_ptr->next = event_info;
+	}
+
 }
 
 libwebsock_context *libwebsock_init(void) {

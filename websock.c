@@ -52,6 +52,7 @@ void libwebsock_handle_client_event(libwebsock_context *ctx, libwebsock_client_s
 	} else {
 		libwebsock_handle_recv(ctx, state, newdata, n);
 	}
+	free(newdata);
 
 }
 
@@ -102,8 +103,6 @@ void libwebsock_handle_recv(libwebsock_context *ctx, libwebsock_client_state *st
 			}
 		}
 	}
-	free(data);
-
 }
 
 void libwebsock_dispatch_message(libwebsock_context *ctx, libwebsock_client_state *state, libwebsock_frame *current) {
@@ -180,6 +179,10 @@ void libwebsock_handshake_finish(libwebsock_context *ctx, libwebsock_client_stat
 			break;
 		}
 	}
+	free(headers);
+	free(str->data);
+	free(str);
+	state->data = NULL;
 
 	
 	if(key == NULL) {
