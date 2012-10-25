@@ -63,7 +63,7 @@ void libwebsock_handle_recv(libwebsock_context *ctx, libwebsock_client_state *st
 	// 2.) we're receiving more data from a frame that was created previously and was not complete
 	libwebsock_frame *current = NULL, *new = NULL;
 	unsigned char payload_len_short;
-	int i;
+	int i, complete_frame;
 	char byte;
 	for(i=0;i<datalen;i++) {
 		byte = *(data+i);
@@ -82,7 +82,8 @@ void libwebsock_handle_recv(libwebsock_context *ctx, libwebsock_client_state *st
 			memset(current->rawdata + current->rawdata_idx, 0, current->rawdata_sz - current->rawdata_idx);
 		}
 		*(current->rawdata + current->rawdata_idx++) = byte;
-		if(libwebsock_complete_frame(current) == 1) {
+		complete_frame = libwebsock_complete_frame(current);
+		if(complete_frame == 1) {
 			if(current->fin == 1) {
 				//is control frame
 				if((current->opcode & 0x08) == 0x08) {
@@ -101,8 +102,33 @@ void libwebsock_handle_recv(libwebsock_context *ctx, libwebsock_client_state *st
 				current->next_frame = new;
 				state->current_frame = new;
 			}
+		} else if(complete_frame == -1) {
+			//FAIL connection
+			libwebsock_fail_connection(state);
+			break;
 		}
 	}
+}
+
+void libwebsock_fail_connection(libwebsock_client_state *state) {
+	char close_frame[] = { 0x88, 0x00 };
+	libwebsock_free_all_frames(state);
+
+	if(state->flags & STATE_IS_SSL) {
+		SSL_write(state->ssl, close_frame, 2);
+		SSL_shutdown(state->ssl);
+		SSL_free(state->ssl);
+	} else {
+		send(state->sockfd, close_frame, 2, 0);
+	}
+
+	close(state->sockfd);
+
+	if(state->sa) {
+		free(state->sa);
+	}
+
+	free(state);
 }
 
 void libwebsock_dispatch_message(libwebsock_context *ctx, libwebsock_client_state *state, libwebsock_frame *current) {
@@ -164,13 +190,13 @@ void libwebsock_handshake_finish(libwebsock_context *ctx, libwebsock_client_stat
 	int n = 0;
 	int x = 0;
 	
-	headers = (char *)malloc(str->data_sz);
+	headers = (char *)malloc(str->data_sz + 1);
 	if(!headers) {
 		fprintf(stderr, "Unable to allocate memory in libwebsock_handshake..\n");
 		close(sockfd);
 		return;
 	}
-	memset(headers, 0, str->data_sz);
+	memset(headers, 0, str->data_sz + 1);
 	strncpy(headers, str->data, str->idx);
 	for(tok = strtok(headers, "\r\n"); tok != NULL; tok = strtok(NULL, "\r\n")) {
 		if(strstr(tok, "Sec-WebSocket-Key: ") != NULL) {
@@ -258,14 +284,9 @@ void libwebsock_handshake(libwebsock_context *ctx, libwebsock_client_state *stat
 	}
 	memcpy(str->data + str->idx, data, datalen);
 	str->idx += datalen;
-	if(strstr(str->data, "\r\n\r\n") != NULL) {
+	if(strstr(str->data, "\r\n\r\n") != NULL || strstr(str->data, "\n\n") != NULL) {
 		libwebsock_handshake_finish(ctx, state);
 	}
-}
-
-void libwebsock_shutdown(libwebsock_context *ctx) {
-	free(ctx->events);
-	free(ctx);
 }
 
 

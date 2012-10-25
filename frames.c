@@ -4,20 +4,19 @@
 #include "websock.h"
 
 void libwebsock_free_all_frames(libwebsock_client_state *state) {
-	libwebsock_frame *current;
+	libwebsock_frame *current, *next;
 	if(state != NULL) {
-		if(state->current_frame != NULL) {
-			current = state->current_frame;
-			for(;current->prev_frame != NULL;current = current->prev_frame) {}
-			for(;current != NULL; current = current->next_frame) {
-				if(current->prev_frame != NULL) {
-					free(current->prev_frame);
-				}
-				if(current->rawdata != NULL) {
+		current = state->current_frame;
+		if(current) {
+			for(;current->prev_frame != NULL; current = current->prev_frame) {}; //rewind
+
+			for(next = current->next_frame; next != NULL; current = next) {
+				next = current->next_frame;
+				if(current->rawdata) {
 					free(current->rawdata);
 				}
+				free(current);
 			}
-			free(current);
 		}
 	}
 }
@@ -60,9 +59,8 @@ int libwebsock_complete_frame(libwebsock_frame *frame) {
 	frame->mask_offset = 2;
 	frame->fin = (*(frame->rawdata) & 0x80) == 0x80 ? 1 : 0;
 	frame->opcode = *(frame->rawdata) & 0x0f;
-	if((*(frame->rawdata+1) & 0x80) != 0x80) {
-		fprintf(stderr, "Received unmasked frame from client.  Fail this in the future.\n");
-		exit(1);
+	if((*(frame->rawdata+1) & 0x80) != 0x80) { //unmasked frame, fail connection.
+		return -1;
 	}
 	payload_len_short = *(frame->rawdata+1) & 0x7f;
 	switch(payload_len_short) {
