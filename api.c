@@ -278,6 +278,10 @@ void libwebsock_cleanup_context(libwebsock_context *ctx) {
 }
 
 void libwebsock_bind_ssl(libwebsock_context *ctx, char *listen_host, char *port, char *keyfile, char *certfile) {
+	libwebsock_bind_ssl_real(ctx, listen_host, port, keyfile, certfile, NULL);
+}
+
+void libwebsock_bind_ssl_real(libwebsock_context *ctx, char *listen_host, char *port, char *keyfile, char *certfile, char *chainfile) {
 	struct addrinfo hints, *servinfo, *p;
 	struct epoll_event ev;
 	libwebsock_event_info *event_info;
@@ -292,6 +296,12 @@ void libwebsock_bind_ssl(libwebsock_context *ctx, char *listen_host, char *port,
 			ERR_print_errors_fp(stderr);
 			exit(1);
 		}
+		if(chainfile != NULL) {
+			if(SSL_CTX_use_certificate_chain_file(ctx->ssl_ctx, chainfile) <= 0) {
+				ERR_print_errors_fp(stderr);
+				exit(1);
+			}
+		}
 		if(SSL_CTX_use_certificate_file(ctx->ssl_ctx, certfile, SSL_FILETYPE_PEM) <= 0) {
 			ERR_print_errors_fp(stderr);
 			exit(1);
@@ -300,6 +310,7 @@ void libwebsock_bind_ssl(libwebsock_context *ctx, char *listen_host, char *port,
 			ERR_print_errors_fp(stderr);
 			exit(1);
 		}
+
 
 		if(!SSL_CTX_check_private_key(ctx->ssl_ctx)) {
 			fprintf(stderr, "Private key does not match the certificate public key.\n");

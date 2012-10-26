@@ -137,6 +137,14 @@ to the list of sockets that will be monitored by epoll in libwebsock_wait.
 This function also flags the listener as SSL enabled and only SSL
 clients should connect to this port.
 
+void libwebsock_bind_ssl_real(libwebsock_context *ctx,
+			  char *listen_host, char *port, char *keyfile,
+			  char *certfile, char *chainfile);
+This is the real function behind libwebsock_bind_ssl.  This function
+accepts the same parameters plus chainfile for certificate bundles.
+libwebsock_bind_ssl simply calls libwebsock_bind_ssl_real with
+chainfile set to NULL.
+
 libwebsock_context *libwebsock_init(void);
 This functions allocates memory for a libwebsock_context and initializes
 it with some defaults.  It registers the default callbacks to be associated
