@@ -12,6 +12,7 @@
 void libwebsock_handle_client_event(libwebsock_context *ctx, libwebsock_client_state *state) {
 	char buf[1024];
 	char *newdata = NULL;
+	libwebsock_string *connecting_str = NULL;
 	int n;
 	memset(buf, 0, 1024);
 	if(state->flags & STATE_IS_SSL) {
@@ -25,7 +26,19 @@ void libwebsock_handle_client_event(libwebsock_context *ctx, libwebsock_client_s
 		return;
 	}
 	if(n == 0) {
-		if(ctx->close_callback != NULL) {
+		//connection closed before handshake finished.  Let's free allocated memory for handshake purposes.
+		if(state->flags & STATE_CONNECTING) {
+			connecting_str = state->data;
+			if(connecting_str) {
+				if(connecting_str->data) {
+					free(connecting_str->data);
+				}
+				free(connecting_str);
+			}
+			state->data = NULL;
+		}
+
+		if(ctx->close_callback != NULL && (state->flags & STATE_CONNECTING) == 0) {
 			ctx->close_callback(state);
 		}
 		libwebsock_free_all_frames(state);
@@ -38,7 +51,6 @@ void libwebsock_handle_client_event(libwebsock_context *ctx, libwebsock_client_s
 			free(state->sa);
 		}
 		if(state->ei) {
-			fprintf(stderr, "Freeing event_info for this client.\n");
 			free(state->ei);
 		}
 		free(state);
