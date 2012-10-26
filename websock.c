@@ -37,6 +37,10 @@ void libwebsock_handle_client_event(libwebsock_context *ctx, libwebsock_client_s
 		if(state->sa) {
 			free(state->sa);
 		}
+		if(state->ei) {
+			fprintf(stderr, "Freeing event_info for this client.\n");
+			free(state->ei);
+		}
 		free(state);
 		return;
 	}
@@ -232,6 +236,7 @@ void libwebsock_handshake_finish(libwebsock_context *ctx, libwebsock_client_stat
 	base64_encode(sha1mac, 20, base64buf, 256);
 	memset(buf, 0, 1024);
 	snprintf(buf, 1024, "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: %s\r\n\r\n", base64buf);
+	free(base64buf);
 	for(n = 0; n < strlen(buf);) {
 		if(state->flags & STATE_IS_SSL) {
 			x = SSL_write(state->ssl, buf+n, strlen(buf+n));

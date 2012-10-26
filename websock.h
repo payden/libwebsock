@@ -44,6 +44,11 @@ typedef struct _libwebsock_message {
 	char *payload;
 } libwebsock_message;
 
+typedef struct _libwebsock_listener_state {
+	int sockfd;
+	int flags;
+} libwebsock_listener_state;
+
 typedef struct _libwebsock_client_state {
 	int sockfd;
 	int flags;
@@ -51,12 +56,8 @@ typedef struct _libwebsock_client_state {
 	libwebsock_frame *current_frame;
 	struct sockaddr_storage *sa;
 	SSL *ssl;
+	struct _libwebsock_event_info *ei;
 } libwebsock_client_state;
-
-typedef struct _libwebsock_listener_state {
-	int sockfd;
-	int flags;
-} libwebsock_listener_state;
 
 typedef union _libwebsock_event_data {
 	libwebsock_client_state *client_state;
@@ -78,8 +79,8 @@ typedef struct _libwebsock_context {
 	int (*connect_callback)(libwebsock_client_state*);
 	int (*close_callback)(libwebsock_client_state*);
 	struct epoll_event *events;
-	struct _libwebsock_event_info *ei;
 	SSL_CTX *ssl_ctx;
+	libwebsock_event_info *listener_ei;
 } libwebsock_context;
 
 

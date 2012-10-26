@@ -197,9 +197,10 @@ void libwebsock_wait(libwebsock_context *ctx) {
 							close(new_fd);
 							return;
 						}
+
 						new_event_info->data.client_state = client_state;
 						memset(client_state, 0, sizeof(libwebsock_client_state));
-
+						client_state->ei = new_event_info;
 						client_state->sa = (struct sockaddr_storage *)malloc(sizeof(struct sockaddr_storage));
 						if(!client_state->sa) {
 							fprintf(stderr, "Error allocating memory for sockaddr_storage in libwebsock_wait.\n");
@@ -252,7 +253,7 @@ void libwebsock_wait(libwebsock_context *ctx) {
 }
 
 void libwebsock_cleanup_context(libwebsock_context *ctx) {
-	libwebsock_event_info *ei, *ei_next;
+	libwebsock_event_info *listener_ei, *listener_ei_next;
 	if(ctx->ssl_ctx) {
 		SSL_CTX_free(ctx->ssl_ctx);
 	}
@@ -262,14 +263,16 @@ void libwebsock_cleanup_context(libwebsock_context *ctx) {
 	if(ctx->epoll_fd) {
 		close(ctx->epoll_fd);
 	}
-	ei_next = ctx->ei;
-	while(ei_next) {
-		ei = ei_next;
-		ei_next = ei->next;
-		if(ei->data.client_state) { //should be true if there is a pointer here, no matter what the type.. we don't care, we're freeing the mem.
-			free(ei->data.client_state);
+
+	listener_ei = ctx->listener_ei;
+
+	while(listener_ei) {
+		listener_ei_next = listener_ei->next;
+		if(listener_ei->data.client_state) { //should be true if there is a pointer here, no matter what the type.. we don't care, we're freeing the mem.
+			free(listener_ei->data.client_state);
 		}
-		free(ei);
+		free(listener_ei);
+		listener_ei = listener_ei_next;
 	}
 	free(ctx);
 }
@@ -456,10 +459,10 @@ void libwebsock_bind(libwebsock_context *ctx, char *listen_host, char *port) {
 		free(ctx);
 		exit(-1);
 	}
-	if(!ctx->ei) {
-		ctx->ei = event_info;
+	if(!ctx->listener_ei) {
+		ctx->listener_ei = event_info;
 	} else {
-		for(ei_ptr = ctx->ei; ei_ptr->next != NULL; ei_ptr = ei_ptr->next) {};
+		for(ei_ptr = ctx->listener_ei; ei_ptr->next != NULL; ei_ptr = ei_ptr->next) {};
 		ei_ptr->next = event_info;
 	}
 

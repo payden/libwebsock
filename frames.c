@@ -9,13 +9,13 @@ void libwebsock_free_all_frames(libwebsock_client_state *state) {
 		current = state->current_frame;
 		if(current) {
 			for(;current->prev_frame != NULL; current = current->prev_frame) {}; //rewind
-
-			for(next = current->next_frame; next != NULL; current = next) {
+			while(current != NULL) {
 				next = current->next_frame;
 				if(current->rawdata) {
 					free(current->rawdata);
 				}
 				free(current);
+				current = next;
 			}
 		}
 	}
