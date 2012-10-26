@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-
+#include <signal.h>
 #include <websock/websock.h>
 
 
@@ -35,6 +35,13 @@ libwebsock_set_receive_cb(ctx, &some_callback_name);
 
 //Here is a little more verbose version of the echo server.
 
+libwebsock_context *gbl_ws_ctx;
+
+void stop_wait(int signum) {
+	if(gbl_ws_ctx)
+		gbl_ws_ctx->running ^= gbl_ws_ctx->running;
+}
+
 int my_receive_callback(libwebsock_client_state *state, libwebsock_message *msg) {
 	printf("Socket Descriptor: %d\n", state->sockfd);
 	printf("Message opcode: %d\n", msg->opcode);
@@ -46,14 +53,16 @@ int my_receive_callback(libwebsock_client_state *state, libwebsock_message *msg)
 
 int main(int argc, char **argv) {
 	libwebsock_context *ctx = NULL;
+	signal(SIGINT, stop_wait); //capture CTRL-C, allow libwebsock_wait loop to break.
 	ctx = libwebsock_init();
 	if(ctx == NULL) {
 		fprintf(stderr, "Error during libwebsock_init.\n");
 		exit(1);
 	}
+	gbl_ws_ctx = ctx;
 	libwebsock_bind(ctx, "0.0.0.0", "3333");
-	libwebsock_bind_ssl(ctx, "0.0.0.0", "8080", "server.key", "server.pem");
 	libwebsock_set_receive_cb(ctx, &my_receive_callback);
 	libwebsock_wait(ctx);
+	printf("Exiting.\n");
 	return 0;
 }
