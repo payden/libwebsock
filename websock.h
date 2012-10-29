@@ -110,5 +110,7 @@ void libwebsock_set_close_cb(libwebsock_context *ctx, int (*cb)(libwebsock_clien
 void libwebsock_set_receive_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state*, libwebsock_message *msg));
 void libwebsock_set_control_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state*, libwebsock_frame *ctl_frame));
 void libwebsock_set_connect_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state *state));
-void libwebsock_add_ssl_port(libwebsock_context *ctx, char *port, char *certfile, char *keyfile);
+void libwebsock_bind(libwebsock_context *ctx, char *listen_host, char *port);
+void libwebsock_bind_ssl(libwebsock_context *ctx, char *listen_host, char *port, char *keyfile, char *certfile);
+void libwebsock_bind_ssl_real(libwebsock_context *ctx, char *listen_host, char *port, char *keyfile, char *certfile, char *chainfile);
 libwebsock_context *libwebsock_init(void);
