@@ -213,14 +213,23 @@ void libwebsock_wait(libwebsock_context *ctx) {
 
 						if(listener_state->flags & LISTENER_STATE_IS_SSL) {
 							client_state->flags |= STATE_IS_SSL;
-							client_state->ssl = SSL_new(ctx->ssl_ctx);
+							client_state->ssl = SSL_new(listener_state->ssl_ctx);
 							SSL_set_fd(client_state->ssl, new_fd);
 							if(SSL_accept(client_state->ssl) <= 0) {
 								fprintf(stderr, "Error during SSL handshake.\n");
 								SSL_shutdown(client_state->ssl);
 								SSL_free(client_state->ssl);
 								close(new_fd);
-								free(client_state);
+								if(client_state->sa) {
+									free(client_state->sa);
+								}
+								if(client_state) {
+									free(client_state);
+								}
+								if(new_event_info) {
+									free(new_event_info);
+								}
+
 								continue;
 							}
 
@@ -254,9 +263,7 @@ void libwebsock_wait(libwebsock_context *ctx) {
 
 void libwebsock_cleanup_context(libwebsock_context *ctx) {
 	libwebsock_event_info *listener_ei, *listener_ei_next;
-	if(ctx->ssl_ctx) {
-		SSL_CTX_free(ctx->ssl_ctx);
-	}
+
 	if(ctx->events) {
 		free(ctx->events);
 	}
@@ -268,8 +275,11 @@ void libwebsock_cleanup_context(libwebsock_context *ctx) {
 
 	while(listener_ei) {
 		listener_ei_next = listener_ei->next;
-		if(listener_ei->data.client_state) { //should be true if there is a pointer here, no matter what the type.. we don't care, we're freeing the mem.
-			free(listener_ei->data.client_state);
+		if(listener_ei->data.listener_state) { //should be true if there is a pointer here, no matter what the type.. we don't care, we're freeing the mem.
+			if(listener_ei->data.listener_state->ssl_ctx) {
+				SSL_CTX_free(listener_ei->data.listener_state->ssl_ctx);
+			}
+			free(listener_ei->data.listener_state);
 		}
 		free(listener_ei);
 		listener_ei = listener_ei_next;
@@ -287,111 +297,116 @@ void libwebsock_bind_ssl_real(libwebsock_context *ctx, char *listen_host, char *
 	libwebsock_event_info *event_info;
 	libwebsock_listener_state *listener_state;
 	int sockfd, yes = 1;
-	if(!ctx->ssl_ctx) {
+
+	if(!ctx->ssl_init) {
 		SSL_library_init();
 		SSL_load_error_strings();
 		OpenSSL_add_all_algorithms();
-		ctx->ssl_ctx = SSL_CTX_new(SSLv23_server_method());
-		if(!ctx->ssl_ctx) {
-			ERR_print_errors_fp(stderr);
-			exit(1);
-		}
-		if(chainfile != NULL) {
-			if(SSL_CTX_load_verify_locations(ctx->ssl_ctx, chainfile, NULL) <= 0) {
-				ERR_print_errors_fp(stderr);
-				exit(1);
-			}
-		}
-		if(SSL_CTX_use_certificate_file(ctx->ssl_ctx, certfile, SSL_FILETYPE_PEM) <= 0) {
-			ERR_print_errors_fp(stderr);
-			exit(1);
-		}
-		if(SSL_CTX_use_PrivateKey_file(ctx->ssl_ctx, keyfile, SSL_FILETYPE_PEM) <= 0) {
-			ERR_print_errors_fp(stderr);
-			exit(1);
-		}
-
-
-		if(!SSL_CTX_check_private_key(ctx->ssl_ctx)) {
-			fprintf(stderr, "Private key does not match the certificate public key.\n");
-			exit(1);
-		}
-		memset(&hints, 0, sizeof(struct addrinfo));
-		memset(&ev, 0, sizeof(struct epoll_event));
-		hints.ai_family = AF_UNSPEC;
-		hints.ai_socktype = SOCK_STREAM;
-		hints.ai_flags = AI_PASSIVE | AI_NUMERICHOST;
-		if((getaddrinfo(listen_host, port, &hints, &servinfo)) != 0) {
-			fprintf(stderr, "getaddrinfo failed during libwebsock_bind.\n");
-			free(ctx);
-			exit(-1);
-		}
-		for(p = servinfo; p != NULL; p = p->ai_next) {
-			if((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
-				perror("socket");
-				continue;
-			}
-			if(setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
-				perror("setsockopt");
-				free(ctx);
-				exit(-1);
-			}
-			if(bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
-				perror("bind");
-				close(sockfd);
-				continue;
-			}
-			break;
-		}
-
-		if(p == NULL) {
-			fprintf(stderr, "Failed to bind to address and port.  Exiting.\n");
-			free(ctx);
-			exit(-1);
-		}
-
-		freeaddrinfo(servinfo);
-
-		if(listen(sockfd, LISTEN_BACKLOG) == -1) {
-			perror("listen");
-			exit(-1);
-		}
-
-		event_info = (libwebsock_event_info *)malloc(sizeof(libwebsock_event_info));
-		if(!event_info) {
-			fprintf(stderr, "Unable to allocate memory for event container in libwebsock_bind.\n");
-			free(ctx);
-			exit(-1);
-		}
-		memset(event_info, 0, sizeof(libwebsock_event_info));
-
-		listener_state = (libwebsock_listener_state *)malloc(sizeof(libwebsock_listener_state));
-		if(!listener_state) {
-			fprintf(stderr, "Unable to allocate memory for listener_state in libwebsock_bind.\n");
-			free(event_info);
-			free(ctx);
-			exit(-1);
-		}
-
-		memset(listener_state, 0, sizeof(libwebsock_listener_state));
-		listener_state->sockfd = sockfd;
-		listener_state->flags |= LISTENER_STATE_IS_SSL;
-		event_info->type = EVENT_INFO_LISTENER;
-		event_info->data.listener_state = listener_state;
-		ev.data.ptr = event_info;
-		ev.events = EPOLLIN;
-		if(epoll_ctl(ctx->epoll_fd, EPOLL_CTL_ADD, sockfd, &ev) == -1) {
-			perror("epoll_ctl");
-			free(listener_state);
-			free(event_info);
-			free(ctx);
-			exit(-1);
-		}
-
-	} else {
-		fprintf(stderr, "You can only bind to one SSL port currently.\n");
-		return;
+		ctx->ssl_init = 1;
 	}
+
+	event_info = (libwebsock_event_info *)malloc(sizeof(libwebsock_event_info));
+	if(!event_info) {
+		fprintf(stderr, "Unable to allocate memory for event container in libwebsock_bind.\n");
+		free(ctx);
+		exit(-1);
+	}
+	memset(event_info, 0, sizeof(libwebsock_event_info));
+
+	listener_state = (libwebsock_listener_state *)malloc(sizeof(libwebsock_listener_state));
+	if(!listener_state) {
+		fprintf(stderr, "Unable to allocate memory for listener_state in libwebsock_bind.\n");
+		free(event_info);
+		free(ctx);
+		exit(-1);
+	}
+
+	memset(listener_state, 0, sizeof(libwebsock_listener_state));
+
+
+
+	listener_state->ssl_ctx = SSL_CTX_new(SSLv23_server_method());
+	if(!listener_state->ssl_ctx) {
+		ERR_print_errors_fp(stderr);
+		exit(1);
+	}
+	if(chainfile != NULL) {
+		if(SSL_CTX_load_verify_locations(listener_state->ssl_ctx, chainfile, NULL) <= 0) {
+			ERR_print_errors_fp(stderr);
+			exit(1);
+		}
+	}
+	if(SSL_CTX_use_certificate_file(listener_state->ssl_ctx, certfile, SSL_FILETYPE_PEM) <= 0) {
+		ERR_print_errors_fp(stderr);
+		exit(1);
+	}
+	if(SSL_CTX_use_PrivateKey_file(listener_state->ssl_ctx, keyfile, SSL_FILETYPE_PEM) <= 0) {
+		ERR_print_errors_fp(stderr);
+		exit(1);
+	}
+
+
+	if(!SSL_CTX_check_private_key(listener_state->ssl_ctx)) {
+		fprintf(stderr, "Private key does not match the certificate public key.\n");
+		exit(1);
+	}
+	memset(&hints, 0, sizeof(struct addrinfo));
+	memset(&ev, 0, sizeof(struct epoll_event));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags = AI_PASSIVE | AI_NUMERICHOST;
+	if((getaddrinfo(listen_host, port, &hints, &servinfo)) != 0) {
+		fprintf(stderr, "getaddrinfo failed during libwebsock_bind.\n");
+		free(ctx);
+		exit(-1);
+	}
+	for(p = servinfo; p != NULL; p = p->ai_next) {
+		if((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
+			perror("socket");
+			continue;
+		}
+		if(setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
+			perror("setsockopt");
+			free(ctx);
+			exit(-1);
+		}
+		if(bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
+			perror("bind");
+			close(sockfd);
+			continue;
+		}
+		break;
+	}
+
+	if(p == NULL) {
+		fprintf(stderr, "Failed to bind to address and port.  Exiting.\n");
+		free(ctx);
+		exit(-1);
+	}
+
+	freeaddrinfo(servinfo);
+
+	if(listen(sockfd, LISTEN_BACKLOG) == -1) {
+		perror("listen");
+		exit(-1);
+	}
+
+
+	listener_state->sockfd = sockfd;
+	listener_state->flags |= LISTENER_STATE_IS_SSL;
+	event_info->type = EVENT_INFO_LISTENER;
+	event_info->data.listener_state = listener_state;
+	ev.data.ptr = event_info;
+	ev.events = EPOLLIN;
+	if(epoll_ctl(ctx->epoll_fd, EPOLL_CTL_ADD, sockfd, &ev) == -1) {
+		perror("epoll_ctl");
+		free(listener_state);
+		free(event_info);
+		free(ctx);
+		exit(-1);
+	}
+
+
 }
 
 void libwebsock_bind(libwebsock_context *ctx, char *listen_host, char *port) {
