@@ -297,7 +297,7 @@ void libwebsock_bind_ssl_real(libwebsock_context *ctx, char *listen_host, char *
 			exit(1);
 		}
 		if(chainfile != NULL) {
-			if(SSL_CTX_use_certificate_chain_file(ctx->ssl_ctx, chainfile) <= 0) {
+			if(SSL_CTX_load_verify_locations(ctx->ssl_ctx, chainfile, NULL) <= 0) {
 				ERR_print_errors_fp(stderr);
 				exit(1);
 			}
