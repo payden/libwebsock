@@ -76,10 +76,10 @@ typedef struct _libwebsock_context {
 	int running;
 	int ssl_init;
 	int epoll_fd;
-	int (*receive_callback)(libwebsock_client_state*, libwebsock_message*);
+	int (*onmessage)(libwebsock_client_state*, libwebsock_message*);
 	int (*control_callback)(libwebsock_client_state*, libwebsock_frame*);
-	int (*connect_callback)(libwebsock_client_state*);
-	int (*close_callback)(libwebsock_client_state*);
+	int (*onopen)(libwebsock_client_state*);
+	int (*onclose)(libwebsock_client_state*);
 	struct epoll_event *events;
 	libwebsock_event_info *listener_ei;
 } libwebsock_context;
@@ -93,9 +93,9 @@ typedef struct _libwebsock_context {
 int libwebsock_send_binary(libwebsock_client_state *state, char *in_data, unsigned long long datalen);
 int libwebsock_send_text(libwebsock_client_state *state, char *strdata);
 int libwebsock_complete_frame(libwebsock_frame *frame);
-int libwebsock_default_close_callback(libwebsock_client_state *state);
-int libwebsock_default_connect_callback(libwebsock_client_state *state);
-int libwebsock_default_receive_callback(libwebsock_client_state *state, libwebsock_message *msg);
+int libwebsock_default_onclose_callback(libwebsock_client_state *state);
+int libwebsock_default_onopen_callback(libwebsock_client_state *state);
+int libwebsock_default_onmessage_callback(libwebsock_client_state *state, libwebsock_message *msg);
 int libwebsock_default_control_callback(libwebsock_client_state *state, libwebsock_frame *ctl_frame);
 void libwebsock_fail_connection(libwebsock_client_state *state);
 void libwebsock_cleanup_context(libwebsock_context *ctx);

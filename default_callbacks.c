@@ -3,17 +3,17 @@
 #include <string.h>
 #include "websock.h"
 
-int libwebsock_default_close_callback(libwebsock_client_state *state) {
+int libwebsock_default_onclose_callback(libwebsock_client_state *state) {
 	fprintf(stderr, "Closing connection with socket descriptor: %d\n", state->sockfd);
 	return 0;
 }
 
-int libwebsock_default_connect_callback(libwebsock_client_state *state) {
+int libwebsock_default_onopen_callback(libwebsock_client_state *state) {
 	fprintf(stderr, "New connection with socket descriptor: %d\n", state->sockfd);
 	return 0;
 }
 
-int libwebsock_default_receive_callback(libwebsock_client_state *state, libwebsock_message *msg) {
+int libwebsock_default_onmessage_callback(libwebsock_client_state *state, libwebsock_message *msg) {
 	libwebsock_send_text(state, msg->payload);
 	return 0;
 }

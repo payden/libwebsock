@@ -31,7 +31,9 @@ to bind itself to a certain IP address and port.  If your server has
 only one IP address or you want to listen on all IP addresses, just
 use "0.0.0.0" for the address.  In this instance, I've used "8080"
 as the port number.  Finally, we call libwebsock_wait supplying the context
-as a parameter and libwebsock will take over from there.
+as a parameter and libwebsock will take over from there.  libwebsock uses 
+epoll to monitor sockets and perform it's work when data is available
+to be read or written.  
 
 The above isn't very useful if you'd like to actually like to do something
 useful with your WebSocket server.  In order to allow the programmer some
@@ -76,10 +78,13 @@ array of the message to send.
 
 If you define your own receive callback named my_receive_callback.  
 You would then have to tell libwebsock about it before calling 
-libwebsock_wait().  You do so with libwebsock_set_receive_cb().
-libwebsock_set_receive_cb expects the context and a pointer to
-the callback function you defined.  You can see this in test.c,
-which is in the root directory of this package.
+libwebsock_wait().  You would do so by setting the context's
+onmessage pointer, like so:
+
+libwebsock_context *ctx = libwebsock_init();
+ctx->onmessage = &my_receive_callback; //&my_receive_callback points to your callback function
+libwebsock_bind(ctx, "0.0.0.0", "8080");
+libwebsock_wait(ctx);
 
 There are a couple of other callbacks which are useful:
 
@@ -90,8 +95,7 @@ int some_connect_cb(libwebsock_client_state *state) {
 	return 0;
 }
 
-You would register this with libwebsock_set_connect_cb(ctx, &some_connect_cb);
-
+ctx->onopen = &some_connect_cb;
 
 The close callback which gets fired when a connected client closes the
 connection.
@@ -100,6 +104,8 @@ int some_close_cb(libwebsock_client_state *state) {
 	fprintf(stderr, "Client closed connection: %d\n",state->sockfd);
 	return 0;
 }
+
+ctx->onclose = &some_close_cb;
 
 There is also a control callback which deals with handling control frames,
 but that can get a little dicey and you'd probably want to study the source
@@ -151,20 +157,4 @@ it with some defaults.  It registers the default callbacks to be associated
 with this context.  It calls epoll_create and stores the epoll_fd in the
 context.  It also allocates memory for the epoll event buffer which is
 pointed to by ctx->events.
-
-void libwebsock_set_close_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state *state));
-This method sets the close callback for the supplied context.  It accepts the context pointer
-and a pointer to a function to be used as the close callback.
-
-void libwebsock_set_connect_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state *state));
-This method sets the connect callback for the supplied context.  It accepts the context pointer
-and a pointer toa  function to be used as the connect callback.
-
-void libwebsock_set_receive_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state *state, libwebsock_message *msg));
-This method sets the receive callback for the supplied context.  It accepts the context pointer
-and a pointer to a function to be used as the receive callback.
-
-void libwebsock_set_control_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state *state, libwebsock_frame *ctl_frame));
-This method sets the control callback for the supplied context.  It accepts the context pointer
-and a pointer to a function to be used as the control callback.
 

@@ -38,8 +38,8 @@ void libwebsock_handle_client_event(libwebsock_context *ctx, libwebsock_client_s
 			state->data = NULL;
 		}
 
-		if(ctx->close_callback != NULL && (state->flags & STATE_CONNECTING) == 0) {
-			ctx->close_callback(state);
+		if(ctx->onclose != NULL && (state->flags & STATE_CONNECTING) == 0) {
+			ctx->onclose(state);
 		}
 		libwebsock_free_all_frames(state);
 		if(state->flags & STATE_IS_SSL) {
@@ -181,10 +181,10 @@ void libwebsock_dispatch_message(libwebsock_context *ctx, libwebsock_client_stat
 	msg->opcode = message_opcode;
 	msg->payload_len = message_offset;
 	msg->payload = message_payload;
-	if(ctx->receive_callback != NULL) {
-		ctx->receive_callback(state, msg);
+	if(ctx->onmessage != NULL) {
+		ctx->onmessage(state, msg);
 	} else {
-		fprintf(stderr, "No received call back registered with libwebsock.\n");
+		fprintf(stderr, "No onmessage call back registered with libwebsock.\n");
 	}
 	free(msg->payload);
 	free(msg);
@@ -262,8 +262,8 @@ void libwebsock_handshake_finish(libwebsock_context *ctx, libwebsock_client_stat
 
 	state->flags &= ~STATE_CONNECTING;
 
-	if(ctx->connect_callback != NULL) {
-		ctx->connect_callback(state);
+	if(ctx->onopen != NULL) {
+		ctx->onopen(state);
 	}
 }
 

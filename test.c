@@ -15,10 +15,10 @@ You probably shouldn't modify any of the data contained in the structures passed
 You can, of course, make copies of the data contained therein.
 
 Here is the default receive_callback as an example:
-(libwebsock_send_text accepts socket descriptor and character array)
+(libwebsock_send_text accepts libwebsock_client_state * and character array)
 
 int some_callback_name(libwebsock_client_state *state, libwebsock_message *msg) {
-	libwebsock_send_text(state->sockfd, msg->payload);
+	libwebsock_send_text(state, msg->payload);
 	return 0;
 }
 
@@ -26,8 +26,7 @@ This callback just provides echoing messages back to the websocket client.
 
 You would register this callback via:
 
-libwebsock_set_receive_cb(ctx, &some_callback_name);
-
+ctx->onopen = &some_callback_name;
 
 
 */
@@ -37,11 +36,16 @@ libwebsock_set_receive_cb(ctx, &some_callback_name);
 
 libwebsock_context *gbl_ws_ctx;
 
+
+//this function just uses a global pointer to the websock context initialized in main and sets
+//the context's running value = 0 causing the libwebsock_wait() loop to break.
 void stop_wait(int signum) {
 	if(gbl_ws_ctx)
 		gbl_ws_ctx->running ^= gbl_ws_ctx->running;
 }
 
+//basic onmessage callback, prints some information about this particular message and the sender
+//then echos back to the client.
 int my_receive_callback(libwebsock_client_state *state, libwebsock_message *msg) {
 	printf("Socket Descriptor: %d\n", state->sockfd);
 	printf("Message opcode: %d\n", msg->opcode);
@@ -61,7 +65,7 @@ int main(int argc, char **argv) {
 	}
 	gbl_ws_ctx = ctx;
 	libwebsock_bind(ctx, "0.0.0.0", "3333");
-	libwebsock_set_receive_cb(ctx, &my_receive_callback);
+	ctx->onmessage = &my_receive_callback;
 	libwebsock_wait(ctx);
 	printf("Exiting.\n");
 	return 0;

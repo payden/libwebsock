@@ -507,10 +507,10 @@ libwebsock_context *libwebsock_init(void) {
 	memset(ctx, 0, sizeof(libwebsock_context));
 
 
-	libwebsock_set_close_cb(ctx, &libwebsock_default_close_callback);
-	libwebsock_set_connect_cb(ctx, &libwebsock_default_connect_callback);
-	libwebsock_set_control_cb(ctx, &libwebsock_default_control_callback);
-	libwebsock_set_receive_cb(ctx, &libwebsock_default_receive_callback);
+	ctx->onclose = &libwebsock_default_onclose_callback;
+	ctx->onopen = &libwebsock_default_onopen_callback;
+	ctx->control_callback = &libwebsock_default_control_callback;
+	ctx->onmessage = &libwebsock_default_onmessage_callback;
 
 	if((ctx->epoll_fd = epoll_create(EPOLL_EVENTS)) == -1) {
 		perror("epoll");
@@ -529,18 +529,3 @@ libwebsock_context *libwebsock_init(void) {
 	return ctx;
 }
 
-void libwebsock_set_close_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state *state)) {
-	ctx->close_callback = cb;
-}
-
-void libwebsock_set_connect_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state *state)) {
-	ctx->connect_callback = cb;
-}
-
-void libwebsock_set_receive_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state *state, libwebsock_message *msg)) {
-	ctx->receive_callback = cb;
-}
-
-void libwebsock_set_control_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state *state, libwebsock_frame *ctl_frame)) {
-	ctx->control_callback = cb;
-}
