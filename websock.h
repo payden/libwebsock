@@ -107,10 +107,6 @@ void libwebsock_handle_client_event(libwebsock_context *ctx, libwebsock_client_s
 void libwebsock_wait(libwebsock_context *ctx);
 void libwebsock_handshake_finish(libwebsock_context *ctx, libwebsock_client_state *state);
 void libwebsock_handshake(libwebsock_context *ctx, libwebsock_client_state *state, char *data, int datalen);
-void libwebsock_set_close_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state*));
-void libwebsock_set_receive_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state*, libwebsock_message *msg));
-void libwebsock_set_control_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state*, libwebsock_frame *ctl_frame));
-void libwebsock_set_connect_cb(libwebsock_context *ctx, int (*cb)(libwebsock_client_state *state));
 void libwebsock_bind(libwebsock_context *ctx, char *listen_host, char *port);
 void libwebsock_bind_ssl(libwebsock_context *ctx, char *listen_host, char *port, char *keyfile, char *certfile);
 void libwebsock_bind_ssl_real(libwebsock_context *ctx, char *listen_host, char *port, char *keyfile, char *certfile, char *chainfile);
