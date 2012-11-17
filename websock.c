@@ -112,7 +112,9 @@ void libwebsock_handle_recv(libwebsock_context *ctx, libwebsock_client_state *st
 				new = (libwebsock_frame *)malloc(sizeof(libwebsock_frame));
 				memset(new, 0, sizeof(libwebsock_frame));
 				new->payload_len = -1;
-				new->rawdata = (char *)malloc(FRAME_CHUNK_LENGTH);
+				new->rawdata_sz = FRAME_CHUNK_LENGTH;
+				new->rawdata = (char *)malloc(new->rawdata_sz);
+
 				memset(new->rawdata, 0, FRAME_CHUNK_LENGTH);
 				new->prev_frame = current;
 				current->next_frame = new;
@@ -158,10 +160,11 @@ void libwebsock_dispatch_message(libwebsock_context *ctx, libwebsock_client_stat
 		exit(1);
 	}
 	message_offset = 0;
-	message_payload_len = current->payload_len;
+	message_payload_len = 0;
 	for(;current->prev_frame != NULL;current = current->prev_frame) {
 		message_payload_len += current->payload_len;
 	}
+	message_payload_len += current->payload_len;
 	first = current;
 	message_opcode = current->opcode;
 	message_payload = (char *)malloc(message_payload_len + 1);
@@ -174,12 +177,13 @@ void libwebsock_dispatch_message(libwebsock_context *ctx, libwebsock_client_stat
 		message_offset += current->payload_len;
 	}
 
+
 	libwebsock_cleanup_frames(first);
 
 	msg = (libwebsock_message *)malloc(sizeof(libwebsock_message));
 	memset(msg, 0, sizeof(libwebsock_message));
 	msg->opcode = message_opcode;
-	msg->payload_len = message_offset;
+	msg->payload_len = message_payload_len;
 	msg->payload = message_payload;
 	if(ctx->onmessage != NULL) {
 		ctx->onmessage(state, msg);

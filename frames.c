@@ -66,7 +66,6 @@ int libwebsock_complete_frame(libwebsock_frame *frame) {
 	switch(payload_len_short) {
 	case 126:
 		if(frame->rawdata_idx < 4) {
-			fprintf(stderr, "Frame has 16 bit payload len, but not enough bytes to read it yet.\n");
 			return 0;
 		}
 		for(i = 0; i < 2; i++) {
@@ -77,7 +76,6 @@ int libwebsock_complete_frame(libwebsock_frame *frame) {
 		break;
 	case 127:
 		if(frame->rawdata_idx < 10) {
-			fprintf(stderr, "Frame has 64 bit payload len, but not enough bytes to read it yet.\n");
 			return 0;
 		}
 		for(i = 0; i < 8; i++) {
