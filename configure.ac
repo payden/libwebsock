@@ -31,5 +31,9 @@ AC_CHECK_LIB(event, event_base_dispatch, [], [
 						echo "libevent required, failing"
 						exit -1
 						])
+AC_CHECK_LIB(event_openssl, bufferevent_openssl_socket_new, [], [
+						echo "libevent_openssl required, failing"
+						exit -1
+						])
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
