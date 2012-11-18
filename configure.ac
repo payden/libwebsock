@@ -23,6 +23,13 @@ AC_TYPE_SIZE_T
 AC_FUNC_MALLOC
 AC_FUNC_REALLOC
 AC_CHECK_FUNCS([memset socket strstr])
-
+AC_CHECK_LIB(ssl, SSL_CTX_new, [], [
+					   echo "This library requires ssl"
+					   exit -1
+					   ])
+AC_CHECK_LIB(event, event_base_dispatch, [], [
+						echo "libevent required, failing"
+						exit -1
+						])
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT

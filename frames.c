@@ -21,9 +21,9 @@ void libwebsock_free_all_frames(libwebsock_client_state *state) {
 	}
 }
 
-void libwebsock_handle_control_frame(libwebsock_context *ctx, libwebsock_client_state *state, libwebsock_frame *ctl_frame) {
+void libwebsock_handle_control_frame(libwebsock_client_state *state, libwebsock_frame *ctl_frame) {
 	libwebsock_frame *ptr = NULL;
-	ctx->control_callback(state, ctl_frame);
+	state->control_callback(state, ctl_frame);
 	//the idea here is to reset this frame to the state it was in before we received control frame.
 	// Control frames can be injected in the midst of a fragmented message.
 	// We need to maintain the link to previous frame if present.
