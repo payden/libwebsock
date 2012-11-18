@@ -9,6 +9,58 @@
 #include "base64.h"
 
 
+void libwebsock_handle_signal(evutil_socket_t sig, short event, void *ptr) {
+	libwebsock_context *ctx = ptr;
+	event_base_loopexit(ctx->base, NULL);
+}
+
+void libwebsock_handle_accept_ssl(evutil_socket_t listener, short event, void *arg) {
+	libwebsock_ssl_event_data *evdata = arg;
+	libwebsock_context *ctx = evdata->ctx;
+	SSL_CTX *ssl_ctx = evdata->ssl_ctx;
+	libwebsock_client_state *client_state;
+	struct bufferevent *bev;
+	struct sockaddr_storage ss, *sa;
+	socklen_t slen = sizeof(ss);
+	int fd = accept(listener, (struct sockaddr *)&ss, &slen);
+	if(fd < 0) {
+		fprintf(stderr, "Error accepting new connection.\n");
+	} else {
+		client_state = (libwebsock_client_state *)malloc(sizeof(libwebsock_client_state));
+		if(!client_state) {
+			fprintf(stderr, "Unable to allocate memory for new connection state structure.\n");
+			close(fd);
+			return;
+		}
+		memset(client_state, 0, sizeof(libwebsock_client_state));
+		client_state->sockfd = fd;
+		client_state->flags |= STATE_CONNECTING | STATE_IS_SSL;
+		client_state->control_callback = ctx->control_callback;
+		client_state->onopen = ctx->onopen;
+		client_state->onmessage = ctx->onmessage;
+		client_state->onclose = ctx->onclose;
+		client_state->sa = (struct sockaddr_storage *)malloc(sizeof(struct sockaddr_storage));
+		if(!client_state->sa) {
+			fprintf(stderr, "Unable to allocate memory for sockaddr_storage.\n");
+			free(client_state);
+			close(fd);
+			return;
+		}
+		memcpy(client_state->sa, &ss, sizeof(struct sockaddr_storage));
+		client_state->ssl = SSL_new(ssl_ctx);
+		SSL_set_fd(client_state->ssl, fd);
+		if(SSL_accept(client_state->ssl) <= 0) {
+			fprintf(stderr, "error during ssl handshake.\n");
+		}
+		evutil_make_socket_nonblocking(fd);
+		bev = bufferevent_openssl_socket_new(ctx->base, -1, client_state->ssl, BUFFEREVENT_SSL_OPEN, BEV_OPT_CLOSE_ON_FREE);
+		client_state->bev = bev;
+		bufferevent_setcb(bev, libwebsock_handshake, NULL, libwebsock_do_error, (void *)client_state);
+		bufferevent_setwatermark(bev, EV_READ, 0, 16384);
+		bufferevent_enable(bev, EV_READ | EV_WRITE);
+	}
+}
+
 void libwebsock_handle_accept(evutil_socket_t listener, short event, void *arg) {
 	libwebsock_context *ctx = arg;
 	libwebsock_client_state *client_state;
@@ -46,8 +98,6 @@ void libwebsock_handle_accept(evutil_socket_t listener, short event, void *arg) 
 		bufferevent_setcb(bev, libwebsock_handshake, NULL, libwebsock_do_error, (void *)client_state);
 		bufferevent_setwatermark(bev, EV_READ, 0, 16384);
 		bufferevent_enable(bev, EV_READ | EV_WRITE);
-
-
 	}
 }
 
@@ -55,7 +105,7 @@ void libwebsock_do_error(struct bufferevent *bev, short error, void *ptr) {
 	libwebsock_client_state *state = ptr;
 	libwebsock_string *str;
 	if(error & BEV_EVENT_EOF) {
-		if(state->flags & STATE_CONNECTED && state->onclose) {
+		if((state->flags & STATE_CONNECTED) && state->onclose) {
 			state->onclose(state);
 		}
 		libwebsock_free_all_frames(state);

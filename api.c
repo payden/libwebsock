@@ -3,6 +3,7 @@
 #include <string.h>
 #include <netdb.h>
 #include <sys/epoll.h>
+#include <signal.h>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #include "websock.h"
@@ -29,6 +30,7 @@ void libwebsock_dump_frame(libwebsock_frame *frame) {
 }
 
 int libwebsock_send_binary(libwebsock_client_state *state, char *in_data, unsigned long long datalen) {
+	struct evbuffer *output = bufferevent_get_output(state->bev);
 	int sockfd = state->sockfd;
 	unsigned long long payload_len;
 	unsigned char finNopcode;
@@ -68,26 +70,20 @@ int libwebsock_send_binary(libwebsock_client_state *state, char *in_data, unsign
 		payload_len &= 0xffff;
 		len_size = 2;
 		for(i = 0; i < len_size; i++) {
-			memcpy(data+2+i, (void *)&payload_len+(len_size-i-1), 1);
+			*(data+2+i) = *((char *)&payload_len+(len_size-i-1));
 		}
 	}
 	if(payload_len_small == 127) {
 		payload_len &= 0xffffffffffffffffLL;
 		len_size = 8;
 		for(i = 0; i < len_size; i++) {
-			memcpy(data+2+i, (void *)&payload_len+(len_size-i-1), 1);
+			*(data+2+i) = *((char *)&payload_len+(len_size-i-1));
 		}
 	}
 	memcpy(data+payload_offset, in_data, datalen);
-	sent = 0;
 
-	while(sent < frame_size) {
-		if(state->flags & STATE_IS_SSL) {
-			sent += SSL_write(state->ssl, data+sent, frame_size - sent);
-		} else {
-			sent += send(sockfd, data+sent, frame_size - sent, 0);
-		}
-	}
+	sent = evbuffer_add(output, data, frame_size);
+
 	free(data);
 	return sent;
 }
@@ -97,6 +93,8 @@ int libwebsock_send_text(libwebsock_client_state *state, char *strdata)  {
 		fprintf(stderr, "Will not send empty message.\n");
 		return -1;
 	}
+
+	struct evbuffer *output = bufferevent_get_output(state->bev);
 	int sockfd = state->sockfd;
 	unsigned long long payload_len;
 	unsigned char finNopcode;
@@ -136,40 +134,37 @@ int libwebsock_send_text(libwebsock_client_state *state, char *strdata)  {
 		payload_len &= 0xffff;
 		len_size = 2;
 		for(i = 0; i < len_size; i++) {
-			memcpy(data+2+i, (void *)&payload_len+(len_size-i-1), 1);
+			*(data+2+i) = *((char *)&payload_len+(len_size-i-1));
 		}
 	}
 	if(payload_len_small == 127) {
 		payload_len &= 0xffffffffffffffffLL;
 		len_size = 8;
 		for(i = 0; i < len_size; i++) {
-			memcpy(data+2+i, (void *)&payload_len+(len_size-i-1), 1);
+			*(data+2+i) = *((char *)&payload_len+(len_size-i-1));
 		}
 	}
 	memcpy(data+payload_offset, strdata, strlen(strdata));
-	sent = 0;
 
-	while(sent < frame_size) {
-		if(state->flags & STATE_IS_SSL) {
-			sent += SSL_write(state->ssl, data+sent, frame_size - sent);
-		} else {
-			sent += send(sockfd, data+sent, frame_size - sent, 0);
-		}
-	}
+	sent = evbuffer_add(output, data, frame_size);
+
 	free(data);
 	return sent;
 }
 
 void libwebsock_wait(libwebsock_context *ctx) {
-	ctx->running = 1;
+	struct event *sig_event;
+	sig_event = evsignal_new(ctx->base, SIGINT, libwebsock_handle_signal, (void *)ctx);
+	event_add(sig_event, NULL);
 	event_base_dispatch(ctx->base);
+	event_free(sig_event);
 }
 
 void libwebsock_cleanup_context(libwebsock_context *ctx) {
 	free(ctx);
 }
 
-/*
+
 void libwebsock_bind_ssl(libwebsock_context *ctx, char *listen_host, char *port, char *keyfile, char *certfile) {
 	libwebsock_bind_ssl_real(ctx, listen_host, port, keyfile, certfile, NULL);
 }
@@ -177,10 +172,17 @@ void libwebsock_bind_ssl(libwebsock_context *ctx, char *listen_host, char *port,
 
 void libwebsock_bind_ssl_real(libwebsock_context *ctx, char *listen_host, char *port, char *keyfile, char *certfile, char *chainfile) {
 	struct addrinfo hints, *servinfo, *p;
-	struct epoll_event ev;
-	libwebsock_event_info *event_info;
-	libwebsock_listener_state *listener_state;
+	struct event *listener_event;
+	libwebsock_ssl_event_data *evdata;
 	int sockfd, yes = 1;
+	SSL_CTX *ssl_ctx;
+
+	evdata = (libwebsock_ssl_event_data *)malloc(sizeof(libwebsock_ssl_event_data));
+	if(!evdata) {
+		fprintf(stderr, "Unable to allocate memory for ssl_event_data.\n");
+		exit(1);
+	}
+	memset(evdata, 0, sizeof(libwebsock_ssl_event_data));
 
 	if(!ctx->ssl_init) {
 		SSL_library_init();
@@ -189,53 +191,33 @@ void libwebsock_bind_ssl_real(libwebsock_context *ctx, char *listen_host, char *
 		ctx->ssl_init = 1;
 	}
 
-	event_info = (libwebsock_event_info *)malloc(sizeof(libwebsock_event_info));
-	if(!event_info) {
-		fprintf(stderr, "Unable to allocate memory for event container in libwebsock_bind.\n");
-		free(ctx);
-		exit(-1);
-	}
-	memset(event_info, 0, sizeof(libwebsock_event_info));
-
-	listener_state = (libwebsock_listener_state *)malloc(sizeof(libwebsock_listener_state));
-	if(!listener_state) {
-		fprintf(stderr, "Unable to allocate memory for listener_state in libwebsock_bind.\n");
-		free(event_info);
-		free(ctx);
-		exit(-1);
-	}
-
-	memset(listener_state, 0, sizeof(libwebsock_listener_state));
-
-
-
-	listener_state->ssl_ctx = SSL_CTX_new(SSLv23_server_method());
-	if(!listener_state->ssl_ctx) {
+	ssl_ctx = SSL_CTX_new(SSLv23_server_method());
+	if(!ssl_ctx) {
 		ERR_print_errors_fp(stderr);
 		exit(1);
 	}
 	if(chainfile != NULL) {
-		if(SSL_CTX_load_verify_locations(listener_state->ssl_ctx, chainfile, NULL) <= 0) {
+		if(SSL_CTX_load_verify_locations(ssl_ctx, chainfile, NULL) <= 0) {
 			ERR_print_errors_fp(stderr);
 			exit(1);
 		}
 	}
-	if(SSL_CTX_use_certificate_file(listener_state->ssl_ctx, certfile, SSL_FILETYPE_PEM) <= 0) {
+	if(SSL_CTX_use_certificate_file(ssl_ctx, certfile, SSL_FILETYPE_PEM) <= 0) {
 		ERR_print_errors_fp(stderr);
 		exit(1);
 	}
-	if(SSL_CTX_use_PrivateKey_file(listener_state->ssl_ctx, keyfile, SSL_FILETYPE_PEM) <= 0) {
+	if(SSL_CTX_use_PrivateKey_file(ssl_ctx, keyfile, SSL_FILETYPE_PEM) <= 0) {
 		ERR_print_errors_fp(stderr);
 		exit(1);
 	}
 
 
-	if(!SSL_CTX_check_private_key(listener_state->ssl_ctx)) {
+	if(!SSL_CTX_check_private_key(ssl_ctx)) {
 		fprintf(stderr, "Private key does not match the certificate public key.\n");
 		exit(1);
 	}
 	memset(&hints, 0, sizeof(struct addrinfo));
-	memset(&ev, 0, sizeof(struct epoll_event));
+
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = AI_PASSIVE | AI_NUMERICHOST;
@@ -274,31 +256,17 @@ void libwebsock_bind_ssl_real(libwebsock_context *ctx, char *listen_host, char *
 		perror("listen");
 		exit(-1);
 	}
+	evdata->ssl_ctx = ssl_ctx;
+	evdata->ctx = ctx;
 
-
-	listener_state->sockfd = sockfd;
-	listener_state->flags |= LISTENER_STATE_IS_SSL;
-	event_info->type = EVENT_INFO_LISTENER;
-	event_info->data.listener_state = listener_state;
-	ev.data.ptr = event_info;
-	ev.events = EPOLLIN;
-	if(epoll_ctl(ctx->epoll_fd, EPOLL_CTL_ADD, sockfd, &ev) == -1) {
-		perror("epoll_ctl");
-		free(listener_state);
-		free(event_info);
-		free(ctx);
-		exit(-1);
-	}
-
-
+	listener_event = event_new(ctx->base, sockfd, EV_READ | EV_PERSIST, libwebsock_handle_accept_ssl, (void *)evdata);
+	event_add(listener_event, NULL);
 }
-*/
+
 void libwebsock_bind(libwebsock_context *ctx, char *listen_host, char *port) {
 	struct addrinfo hints, *servinfo, *p;
 	struct event *listener_event;
 
-	libwebsock_event_info *event_info, *ei_ptr;
-	libwebsock_listener_state *listener_state;
 	evutil_socket_t sockfd;
 	int yes = 1;
 	memset(&hints, 0, sizeof(struct addrinfo));

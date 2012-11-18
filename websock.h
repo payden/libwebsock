@@ -3,16 +3,14 @@
 #include <event2/event.h>
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
+#include <event2/bufferevent_ssl.h>
 
 
-#define EPOLL_EVENTS 100
 #define PORT_STRLEN 12
 #define LISTEN_BACKLOG 10
 #define FRAME_CHUNK_LENGTH 1024
 #define MASK_LENGTH 4
 
-#define EVENT_INFO_CLIENT 1
-#define EVENT_INFO_LISTENER 2
 
 #define STATE_SHOULD_CLOSE (1 << 0)
 #define STATE_SENT_CLOSE_FRAME (1 << 1)
@@ -20,7 +18,6 @@
 #define STATE_IS_SSL (1 << 3)
 #define STATE_CONNECTED (1 << 4)
 
-#define LISTENER_STATE_IS_SSL (1 << 0)
 
 typedef struct _libwebsock_string {
 	char *data;
@@ -49,12 +46,6 @@ typedef struct _libwebsock_message {
 	char *payload;
 } libwebsock_message;
 
-typedef struct _libwebsock_listener_state {
-	int sockfd;
-	int flags;
-	SSL_CTX *ssl_ctx;
-} libwebsock_listener_state;
-
 typedef struct _libwebsock_client_state {
 	int sockfd;
 	int flags;
@@ -69,18 +60,6 @@ typedef struct _libwebsock_client_state {
 	int (*onclose)(struct _libwebsock_client_state*);
 } libwebsock_client_state;
 
-typedef union _libwebsock_event_data {
-	libwebsock_client_state *client_state;
-	libwebsock_listener_state *listener_state;
-
-} libwebsock_event_data;
-
-typedef struct _libwebsock_event_info {
-	int type;
-	libwebsock_event_data data;
-	struct _libwebsock_event_info *next;
-} libwebsock_event_info;
-
 typedef struct _libwebsock_context {
 	int running;
 	int ssl_init;
@@ -89,10 +68,12 @@ typedef struct _libwebsock_context {
 	int (*control_callback)(libwebsock_client_state*, libwebsock_frame*);
 	int (*onopen)(libwebsock_client_state*);
 	int (*onclose)(libwebsock_client_state*);
-	libwebsock_event_info *listener_ei;
 } libwebsock_context;
 
-
+typedef struct _libwebsock_ssl_event_data {
+	SSL_CTX *ssl_ctx;
+	libwebsock_context *ctx;
+} libwebsock_ssl_event_data;
 
 
 
@@ -107,9 +88,11 @@ int libwebsock_default_onmessage_callback(libwebsock_client_state *state, libweb
 int libwebsock_default_control_callback(libwebsock_client_state *state, libwebsock_frame *ctl_frame);
 void libwebsock_fail_connection(libwebsock_client_state *state);
 void libwebsock_cleanup_context(libwebsock_context *ctx);
+void libwebsock_handle_signal(evutil_socket_t sig, short event, void *ptr);
 void libwebsock_handle_control_frame(libwebsock_client_state *state, libwebsock_frame *ctl_frame);
 void libwebsock_dispatch_message(libwebsock_client_state *state, libwebsock_frame *current);
 void libwebsock_dump_frame(libwebsock_frame *frame);
+void libwebsock_handle_accept_ssl(evutil_socket_t listener, short event, void *arg);
 void libwebsock_handle_accept(evutil_socket_t listener, short event, void *arg);
 void libwebsock_handle_recv(struct bufferevent *bev, void *ptr);
 void libwebsock_handle_client_event(libwebsock_context *ctx, libwebsock_client_state *state);

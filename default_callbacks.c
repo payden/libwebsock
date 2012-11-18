@@ -19,6 +19,7 @@ int libwebsock_default_onmessage_callback(libwebsock_client_state *state, libweb
 }
 
 int libwebsock_default_control_callback(libwebsock_client_state *state, libwebsock_frame *ctl_frame) {
+	struct evbuffer *output = bufferevent_get_output(state->bev);
 	int i;
 	switch(ctl_frame->opcode) {
 		case 0x8:
@@ -28,14 +29,7 @@ int libwebsock_default_control_callback(libwebsock_client_state *state, libwebso
 				for(i=0;i<ctl_frame->payload_len;i++)
 					*(ctl_frame->rawdata + ctl_frame->payload_offset + i) ^= (ctl_frame->mask[i % 4] & 0xff); //demask payload
 				*(ctl_frame->rawdata + 1) &= 0x7f; //strip mask bit
-				i = 0;
-				while(i < ctl_frame->payload_offset + ctl_frame->payload_len) {
-					if(state->flags & STATE_IS_SSL) {
-						i += SSL_write(state->ssl, ctl_frame->rawdata + i, ctl_frame->payload_offset + ctl_frame->payload_len - i);
-					} else {
-						i += send(state->sockfd, ctl_frame->rawdata + i, ctl_frame->payload_offset + ctl_frame->payload_len - i, 0);
-					}
-				}
+				evbuffer_add(output, ctl_frame->rawdata, ctl_frame->payload_offset + ctl_frame->payload_len);
 			}
 			state->flags |= STATE_SHOULD_CLOSE;
 			break;
