@@ -13,3 +13,4 @@ Features
 * SSL Support
 * Easy to use
 * Uses libevent for portability (tested on Linux/FreeBSD)
+* IPv6 support
