@@ -8,7 +8,7 @@
 
 Define message callback with same prototype as below.
 Accepts pointer to libwebsock_client_state structure and pointer to libwebsock_message structure.
-libwebsock_client_state has int sockfd, int sent_close_frame, int should_close, and libwebsock_frame *current_frame
+libwebsock_client_state has int sockfd, struct sockaddr_storage *sa
 libwebsock_message has unsigned int opcode, unsigned long long payload_len, and char *payload
 
 You probably shouldn't modify any of the data contained in the structures passed to the callback.  It will probably cause bad things to happen.
@@ -32,14 +32,10 @@ ctx->onopen = some_callback_name;
 */
 
 
-//Here is a little more verbose version of the echo server.
-
-
-
-//basic onmessage callback, prints some information about this particular message and the sender
+//basic onmessage callback, prints some information about this particular message
 //then echos back to the client.
-int my_receive_callback(libwebsock_client_state *state, libwebsock_message *msg) {
-	fprintf(stderr, "Socket Descriptor: %d\n", state->sockfd);
+int onmessage(libwebsock_client_state *state, libwebsock_message *msg) {
+	fprintf(stderr, "Received message from client: %d\n", state->sockfd);
 	fprintf(stderr, "Message opcode: %d\n", msg->opcode);
 	fprintf(stderr, "Payload Length: %llu\n", msg->payload_len);
 	fprintf(stderr, "Payload: %s\n", msg->payload);
@@ -58,15 +54,21 @@ int onclose(libwebsock_client_state *state) {
 	return 0;
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char *argv[]) {
 	libwebsock_context *ctx = NULL;
+	if(argc != 2) {
+		fprintf(stderr, "Usage: %s <port to listen on>\n\nNote: You must be root to bind to port below 1024\n", *argv);
+		exit(0);
+	}
+	
 	ctx = libwebsock_init();
 	if(ctx == NULL) {
 		fprintf(stderr, "Error during libwebsock_init.\n");
 		exit(1);
 	}
-	libwebsock_bind(ctx, "0.0.0.0", "8080");
-	ctx->onmessage = my_receive_callback;
+	libwebsock_bind(ctx, "0.0.0.0", argv[1]);
+	fprintf(stderr, "libwebsock listening on port %s\n", argv[1]);
+	ctx->onmessage = onmessage;
 	ctx->onopen = onopen;
 	ctx->onclose = onclose;
 	libwebsock_wait(ctx);
