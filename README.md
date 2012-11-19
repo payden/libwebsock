@@ -12,4 +12,4 @@ Features
 * Callbacks for events
 * SSL Support
 * Easy to use
-* Tested on Linux/FreeBSD
+* Uses libevent for portability (tested on Linux/FreeBSD)
