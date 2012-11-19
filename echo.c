@@ -1,6 +1,19 @@
+/*
+
+Install libwebsock with:
+
+./autogen.sh
+./configure && make && sudo make install
+
+
+Then, compile this echo server with:
+
+gcc -g -O2 -o echo echo.c -lwebsock
+
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
-#include <signal.h>
 #include <websock/websock.h>
 
 
