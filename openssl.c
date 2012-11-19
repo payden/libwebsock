@@ -1,9 +1,3 @@
-#include <openssl/ssl.h>
-#include <event2/event.h>
-#include <event2/buffer.h>
-#include <event2/bufferevent.h>
-#include <event2/bufferevent_ssl.h>
-
 #include "websock.h"
 
 void libwebsock_handle_accept_ssl(evutil_socket_t listener, short event, void *arg) {
