@@ -258,7 +258,6 @@ void libwebsock_handshake_finish(struct bufferevent *bev, libwebsock_client_stat
 	char *tok = NULL, *headers = NULL, *key = NULL;
 	char *base64buf = NULL;
 	const char *GID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
-	struct epoll_event ev;
 	int sockfd = state->sockfd;
 	SHA1Context shactx;
 	SHA1Reset(&shactx);
