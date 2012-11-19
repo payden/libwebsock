@@ -29,58 +29,48 @@ void libwebsock_dump_frame(libwebsock_frame *frame) {
 	fprintf(stderr, "\n");
 }
 
-int libwebsock_send_binary(libwebsock_client_state *state, char *in_data, unsigned long long datalen) {
+int libwebsock_send_binary(libwebsock_client_state *state, char *in_data, unsigned long long payload_len) {
 	struct evbuffer *output = bufferevent_get_output(state->bev);
-	int sockfd = state->sockfd;
-	unsigned long long payload_len;
-	unsigned char finNopcode;
-	unsigned int payload_len_small;
+	unsigned long long payload_len_be, frame_size;
+	unsigned char finNopcode, payload_len_small;
 	unsigned int payload_offset = 2;
 	unsigned int len_size;
-	unsigned long long be_payload_len;
 	unsigned int sent = 0;
 	int i;
-	unsigned int frame_size;
 	char *data;
-	payload_len = datalen;
+	payload_len_be = htobe64(payload_len);
 	finNopcode = 0x82; //FIN and binary opcode.
 	if(payload_len <= 125) {
 		frame_size = 2 + payload_len;
-		data = (void *)malloc(frame_size);
 		payload_len_small = payload_len;
 	} else if(payload_len > 125 && payload_len <= 0xffff) {
 		frame_size = 4 + payload_len;
-		data = (void *)malloc(frame_size);
 		payload_len_small = 126;
 		payload_offset += 2;
 	} else if(payload_len > 0xffff && payload_len <= 0xffffffffffffffffLL) {
 		frame_size = 10 + payload_len;
-		data = (void *)malloc(frame_size);
 		payload_len_small = 127;
 		payload_offset += 8;
 	} else {
 		fprintf(stderr, "Whoa man.  What are you trying to send?\n");
 		return -1;
 	}
+	data = (char *)malloc(frame_size);
 	memset(data, 0, frame_size);
 	payload_len_small &= 0x7f;
-	memcpy(data, &finNopcode, 1);
-	memcpy(data+1, &payload_len_small, 1); //mask bit off, 7 bit payload len
+	*data = finNopcode;
+	*(data+1) = payload_len_small;
 	if(payload_len_small == 126) {
 		payload_len &= 0xffff;
 		len_size = 2;
-		for(i = 0; i < len_size; i++) {
-			*(data+2+i) = *((char *)&payload_len+(len_size-i-1));
-		}
+		memcpy(data+2, &payload_len_be, len_size);
 	}
 	if(payload_len_small == 127) {
 		payload_len &= 0xffffffffffffffffLL;
 		len_size = 8;
-		for(i = 0; i < len_size; i++) {
-			*(data+2+i) = *((char *)&payload_len+(len_size-i-1));
-		}
+		memcpy(data+2, &payload_len_be, len_size);
 	}
-	memcpy(data+payload_offset, in_data, datalen);
+	memcpy(data+payload_offset, in_data, payload_len);
 
 	sent = evbuffer_add(output, data, frame_size);
 
@@ -95,54 +85,49 @@ int libwebsock_send_text(libwebsock_client_state *state, char *strdata)  {
 	}
 
 	struct evbuffer *output = bufferevent_get_output(state->bev);
-	int sockfd = state->sockfd;
-	unsigned long long payload_len;
-	unsigned char finNopcode;
-	unsigned int payload_len_small;
+	unsigned long long payload_len, payload_len_be;
+	unsigned char finNopcode, payload_len_small;
 	unsigned int payload_offset = 2;
 	unsigned int len_size;
 	unsigned long long be_payload_len;
 	unsigned int sent = 0;
-	int i;
 	unsigned int frame_size;
+	int i;
 	char *data;
 	payload_len = strlen(strdata);
+	payload_len_be = htobe64(payload_len);
+
+	fprintf(stderr, "\n");
 	finNopcode = 0x81; //FIN and text opcode.
 	if(payload_len <= 125) {
 		frame_size = 2 + payload_len;
-		data = (void *)malloc(frame_size);
 		payload_len_small = payload_len;
 	} else if(payload_len > 125 && payload_len <= 0xffff) {
 		frame_size = 4 + payload_len;
-		data = (void *)malloc(frame_size);
 		payload_len_small = 126;
 		payload_offset += 2;
 	} else if(payload_len > 0xffff && payload_len <= 0xffffffffffffffffLL) {
 		frame_size = 10 + payload_len;
-		data = (void *)malloc(frame_size);
 		payload_len_small = 127;
 		payload_offset += 8;
 	} else {
 		fprintf(stderr, "Whoa man.  What are you trying to send?\n");
 		return -1;
 	}
+	data = (char *)malloc(frame_size);
 	memset(data, 0, frame_size);
 	payload_len_small &= 0x7f;
-	memcpy(data, &finNopcode, 1);
-	memcpy(data+1, &payload_len_small, 1); //mask bit off, 7 bit payload len
+	*data = finNopcode;
+	*(data+1) = payload_len_small;
 	if(payload_len_small == 126) {
 		payload_len &= 0xffff;
 		len_size = 2;
-		for(i = 0; i < len_size; i++) {
-			*(data+2+i) = *((char *)&payload_len+(len_size-i-1));
-		}
+		memcpy(data+2, &payload_len_be, len_size);
 	}
 	if(payload_len_small == 127) {
 		payload_len &= 0xffffffffffffffffLL;
 		len_size = 8;
-		for(i = 0; i < len_size; i++) {
-			*(data+2+i) = *((char *)&payload_len+(len_size-i-1));
-		}
+		memcpy(data+2, &payload_len_be, len_size);
 	}
 	memcpy(data+payload_offset, strdata, strlen(strdata));
 

@@ -68,9 +68,7 @@ int libwebsock_complete_frame(libwebsock_frame *frame) {
 		if(frame->rawdata_idx < 4) {
 			return 0;
 		}
-		for(i = 0; i < 2; i++) {
-			*((char *)&payload_len+i) = *(frame->rawdata+3-i);
-		}
+		payload_len = be16toh(*((unsigned short int *)(frame->rawdata+2)));
 		frame->mask_offset += 2;
 		frame->payload_len = payload_len;
 		break;
@@ -78,9 +76,7 @@ int libwebsock_complete_frame(libwebsock_frame *frame) {
 		if(frame->rawdata_idx < 10) {
 			return 0;
 		}
-		for(i = 0; i < 8; i++) {
-			*((char *)&payload_len+i) = *(frame->rawdata+9-i);
-		}
+		payload_len = be64toh(*((unsigned long long *)(frame->rawdata+2)));
 		frame->mask_offset += 8;
 		frame->payload_len = payload_len;
 		break;

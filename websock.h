@@ -1,4 +1,18 @@
 //libwebsock Copyright 2012 Payden Sutherland
+
+//this bit hides differences between systems on big-endian conversions
+#if defined(__linux__)
+#  include <endian.h>
+#elif defined(__FreeBSD__) || defined(__NetBSD__)
+#  include <sys/endian.h>
+#elif defined(__OpenBSD__)
+#  include <sys/types.h>
+#  define be16toh(x) betoh16(x)
+#  define be32toh(x) betoh32(x)
+#  define be64toh(x) betoh64(x)
+#endif
+
+
 #include <openssl/ssl.h>
 #include <event2/event.h>
 #include <event2/buffer.h>
@@ -79,7 +93,7 @@ typedef struct _libwebsock_ssl_event_data {
 
 //function defs
 
-int libwebsock_send_binary(libwebsock_client_state *state, char *in_data, unsigned long long datalen);
+int libwebsock_send_binary(libwebsock_client_state *state, char *in_data, unsigned long long payload_len);
 int libwebsock_send_text(libwebsock_client_state *state, char *strdata);
 int libwebsock_complete_frame(libwebsock_frame *frame);
 int libwebsock_default_onclose_callback(libwebsock_client_state *state);

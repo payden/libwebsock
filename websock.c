@@ -105,8 +105,6 @@ void libwebsock_do_event(struct bufferevent *bev, short event, void *ptr) {
 	libwebsock_client_state *state = ptr;
 	libwebsock_string *str;
 
-	fprintf(stderr, "do_event called with event: %hi\n", event);
-
 	if((state->flags & STATE_CONNECTED) && state->onclose) {
 		state->onclose(state);
 	}
@@ -192,18 +190,12 @@ void libwebsock_handle_recv(struct bufferevent *bev, void *ptr) {
 }
 
 void libwebsock_fail_connection(libwebsock_client_state *state) {
+	struct evbuffer *output = bufferevent_get_output(state->bev);
 	char close_frame[] = { 0x88, 0x00 };
 	libwebsock_free_all_frames(state);
 
-	if(state->flags & STATE_IS_SSL) {
-		SSL_write(state->ssl, close_frame, 2);
-		SSL_shutdown(state->ssl);
-		SSL_free(state->ssl);
-	} else {
-		send(state->sockfd, close_frame, 2, 0);
-	}
+	evbuffer_add(output, close_frame, 2);
 
-	close(state->sockfd);
 
 	if(state->sa) {
 		free(state->sa);

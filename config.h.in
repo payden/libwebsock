@@ -9,6 +9,9 @@
 /* Define to 1 if you have the `event' library (-levent). */
 #undef HAVE_LIBEVENT
 
+/* Define to 1 if you have the `event_openssl' library (-levent_openssl). */
+#undef HAVE_LIBEVENT_OPENSSL
+
 /* Define to 1 if you have the `ssl' library (-lssl). */
 #undef HAVE_LIBSSL
 

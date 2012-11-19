@@ -26,7 +26,7 @@ This callback just provides echoing messages back to the websocket client.
 
 You would register this callback via:
 
-ctx->onopen = &some_callback_name;
+ctx->onopen = some_callback_name;
 
 
 */
@@ -34,39 +34,43 @@ ctx->onopen = &some_callback_name;
 
 //Here is a little more verbose version of the echo server.
 
-libwebsock_context *gbl_ws_ctx;
 
-
-//this function just uses a global pointer to the websock context initialized in main and sets
-//the context's running value = 0 causing the libwebsock_wait() loop to break.
-void stop_wait(int signum) {
-	if(gbl_ws_ctx)
-		gbl_ws_ctx->running ^= gbl_ws_ctx->running;
-}
 
 //basic onmessage callback, prints some information about this particular message and the sender
 //then echos back to the client.
 int my_receive_callback(libwebsock_client_state *state, libwebsock_message *msg) {
-	printf("Socket Descriptor: %d\n", state->sockfd);
-	printf("Message opcode: %d\n", msg->opcode);
-	printf("Payload Length: %llu\n", msg->payload_len);
-	printf("Payload: %s\n", msg->payload);
+	fprintf(stderr, "Socket Descriptor: %d\n", state->sockfd);
+	fprintf(stderr, "Message opcode: %d\n", msg->opcode);
+	fprintf(stderr, "Payload Length: %llu\n", msg->payload_len);
+	fprintf(stderr, "Payload: %s\n", msg->payload);
 	//now let's send it back.
 	libwebsock_send_text(state, msg->payload);
+	return 0;
+}
+
+int onopen(libwebsock_client_state *state) {
+	fprintf(stderr, "onopen: %d\n", state->sockfd);
+	return 0;
+}
+
+int onclose(libwebsock_client_state *state) {
+	fprintf(stderr, "onclose: %d\n", state->sockfd);
+	return 0;
 }
 
 int main(int argc, char **argv) {
 	libwebsock_context *ctx = NULL;
-	signal(SIGINT, stop_wait); //capture CTRL-C, allow libwebsock_wait loop to break.
 	ctx = libwebsock_init();
 	if(ctx == NULL) {
 		fprintf(stderr, "Error during libwebsock_init.\n");
 		exit(1);
 	}
-	gbl_ws_ctx = ctx;
-	libwebsock_bind(ctx, "0.0.0.0", "3333");
-	ctx->onmessage = &my_receive_callback;
+	libwebsock_bind(ctx, "0.0.0.0", "8080");
+	ctx->onmessage = my_receive_callback;
+	ctx->onopen = onopen;
+	ctx->onclose = onclose;
 	libwebsock_wait(ctx);
-	printf("Exiting.\n");
+	//perform any cleanup here.
+	fprintf(stderr, "Exiting.\n");
 	return 0;
 }
