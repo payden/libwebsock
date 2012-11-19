@@ -3,8 +3,6 @@
 #include <string.h>
 #include <netdb.h>
 #include <signal.h>
-#include <openssl/ssl.h>
-#include <openssl/err.h>
 #include "websock.h"
 
 
@@ -149,105 +147,6 @@ void libwebsock_wait(libwebsock_context *ctx) {
 
 void libwebsock_cleanup_context(libwebsock_context *ctx) {
 	free(ctx);
-}
-
-
-void libwebsock_bind_ssl(libwebsock_context *ctx, char *listen_host, char *port, char *keyfile, char *certfile) {
-	libwebsock_bind_ssl_real(ctx, listen_host, port, keyfile, certfile, NULL);
-}
-
-
-void libwebsock_bind_ssl_real(libwebsock_context *ctx, char *listen_host, char *port, char *keyfile, char *certfile, char *chainfile) {
-	struct addrinfo hints, *servinfo, *p;
-	struct event *listener_event;
-	libwebsock_ssl_event_data *evdata;
-	int sockfd, yes = 1;
-	SSL_CTX *ssl_ctx;
-
-	evdata = (libwebsock_ssl_event_data *)malloc(sizeof(libwebsock_ssl_event_data));
-	if(!evdata) {
-		fprintf(stderr, "Unable to allocate memory for ssl_event_data.\n");
-		exit(1);
-	}
-	memset(evdata, 0, sizeof(libwebsock_ssl_event_data));
-
-	if(!ctx->ssl_init) {
-		SSL_library_init();
-		SSL_load_error_strings();
-		OpenSSL_add_all_algorithms();
-		ctx->ssl_init = 1;
-	}
-
-	ssl_ctx = SSL_CTX_new(SSLv23_server_method());
-	if(!ssl_ctx) {
-		ERR_print_errors_fp(stderr);
-		exit(1);
-	}
-	if(chainfile != NULL) {
-		if(SSL_CTX_load_verify_locations(ssl_ctx, chainfile, NULL) <= 0) {
-			ERR_print_errors_fp(stderr);
-			exit(1);
-		}
-	}
-	if(SSL_CTX_use_certificate_file(ssl_ctx, certfile, SSL_FILETYPE_PEM) <= 0) {
-		ERR_print_errors_fp(stderr);
-		exit(1);
-	}
-	if(SSL_CTX_use_PrivateKey_file(ssl_ctx, keyfile, SSL_FILETYPE_PEM) <= 0) {
-		ERR_print_errors_fp(stderr);
-		exit(1);
-	}
-
-
-	if(!SSL_CTX_check_private_key(ssl_ctx)) {
-		fprintf(stderr, "Private key does not match the certificate public key.\n");
-		exit(1);
-	}
-	memset(&hints, 0, sizeof(struct addrinfo));
-
-	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_flags = AI_PASSIVE;
-	if((getaddrinfo(listen_host, port, &hints, &servinfo)) != 0) {
-		fprintf(stderr, "getaddrinfo failed during libwebsock_bind.\n");
-		free(ctx);
-		exit(-1);
-	}
-	for(p = servinfo; p != NULL; p = p->ai_next) {
-		if((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
-			perror("socket");
-			continue;
-		}
-		if(setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
-			perror("setsockopt");
-			free(ctx);
-			exit(-1);
-		}
-		if(bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
-			perror("bind");
-			close(sockfd);
-			continue;
-		}
-		break;
-	}
-
-	if(p == NULL) {
-		fprintf(stderr, "Failed to bind to address and port.  Exiting.\n");
-		free(ctx);
-		exit(-1);
-	}
-
-	freeaddrinfo(servinfo);
-
-	if(listen(sockfd, LISTEN_BACKLOG) == -1) {
-		perror("listen");
-		exit(-1);
-	}
-	evdata->ssl_ctx = ssl_ctx;
-	evdata->ctx = ctx;
-
-	listener_event = event_new(ctx->base, sockfd, EV_READ | EV_PERSIST, libwebsock_handle_accept_ssl, (void *)evdata);
-	event_add(listener_event, NULL);
 }
 
 void libwebsock_bind(libwebsock_context *ctx, char *listen_host, char *port) {

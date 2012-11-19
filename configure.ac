@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.60])
-AC_INIT([libwebsock], [1.0.1], [payden@paydensutherland.com])
+AC_INIT([libwebsock], [1.0.0], [payden@paydensutherland.com])
 AM_INIT_AUTOMAKE
 LT_INIT([disable-static])
 AC_CONFIG_SRCDIR([websock.c])
@@ -11,7 +11,10 @@ AC_CONFIG_MACRO_DIR([m4])
 # Checks for programs.
 AC_PROG_CC
 
-# Checks for libraries.
+AC_ARG_WITH([ssl],
+  [AS_HELP_STRING([--without-ssl],[Disable building with SSL support])])
+
+
 
 # Checks for header files.
 AC_CHECK_HEADERS([netdb.h stdlib.h string.h sys/socket.h unistd.h])
@@ -23,17 +26,35 @@ AC_TYPE_SIZE_T
 AC_FUNC_MALLOC
 AC_FUNC_REALLOC
 AC_CHECK_FUNCS([memset socket strstr])
-AC_CHECK_LIB(ssl, SSL_CTX_new, [], [
-					   echo "This library requires ssl"
-					   exit -1
-					   ])
+
 AC_CHECK_LIB(event, event_base_dispatch, [], [
 						echo "libevent required, failing"
 						exit -1
 						])
-AC_CHECK_LIB(event_openssl, bufferevent_openssl_socket_new, [], [
-						echo "libevent_openssl required, failing"
-						exit -1
-						])
+
+AS_IF([test "x$with_ssl" != "xno"],
+	[
+  	AC_CHECK_LIB([ssl], [SSL_CTX_new],
+  		[
+  			LIBS="-lssl ${LIBS}"
+  			AC_CHECK_LIB([event_openssl], [bufferevent_openssl_socket_new], [
+  				LIBS="-levent_openssl ${LIBS}"
+  				have_ssl=yes
+  			], [have_ssl=no])
+  		], 
+  		[have_ssl=no])
+  	],
+  	[have_ssl=no])
+  	
+AS_IF([test "x$have_ssl" = "xyes"],
+	[
+		AC_DEFINE([WEBSOCK_HAVE_SSL], [1], [Define if building SSL support])
+	],
+	[AS_IF([test "x$with_ssl" = "xyes"],
+		[AC_MSG_ERROR([SSL support requested but not found])
+	])])
+  	
+AM_CONDITIONAL([HAVE_SSL], [test "x$have_ssl" = "xyes"])
+
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT

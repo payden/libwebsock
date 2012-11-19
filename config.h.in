@@ -9,12 +9,6 @@
 /* Define to 1 if you have the `event' library (-levent). */
 #undef HAVE_LIBEVENT
 
-/* Define to 1 if you have the `event_openssl' library (-levent_openssl). */
-#undef HAVE_LIBEVENT_OPENSSL
-
-/* Define to 1 if you have the `ssl' library (-lssl). */
-#undef HAVE_LIBSSL
-
 /* Define to 1 if your system has a GNU libc compatible `malloc' function, and
    to 0 otherwise. */
 #undef HAVE_MALLOC
@@ -92,6 +86,9 @@
 
 /* Version number of package */
 #undef VERSION
+
+/* Define if building SSL support */
+#undef WEBSOCK_HAVE_SSL
 
 /* Define to rpl_malloc if the replacement function should be used. */
 #undef malloc

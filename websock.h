@@ -1,5 +1,7 @@
 //libwebsock Copyright 2012 Payden Sutherland
 
+#include "config.h"
+
 //this bit hides differences between systems on big-endian conversions
 #if defined(__linux__)
 #  include <endian.h>
@@ -13,11 +15,13 @@
 #endif
 
 
-#include <openssl/ssl.h>
 #include <event2/event.h>
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
+#ifdef WEBSOCK_HAVE_SSL
+#include <openssl/ssl.h>
 #include <event2/bufferevent_ssl.h>
+#endif
 
 
 #define PORT_STRLEN 12
@@ -66,12 +70,14 @@ typedef struct _libwebsock_client_state {
 	void *data;
 	libwebsock_frame *current_frame;
 	struct sockaddr_storage *sa;
-	SSL *ssl;
 	struct bufferevent *bev;
 	int (*onmessage)(struct _libwebsock_client_state*, libwebsock_message*);
 	int (*control_callback)(struct _libwebsock_client_state*, libwebsock_frame*);
 	int (*onopen)(struct _libwebsock_client_state*);
 	int (*onclose)(struct _libwebsock_client_state*);
+#ifdef WEBSOCK_HAVE_SSL
+	SSL *ssl;
+#endif
 } libwebsock_client_state;
 
 typedef struct _libwebsock_context {
@@ -84,11 +90,12 @@ typedef struct _libwebsock_context {
 	int (*onclose)(libwebsock_client_state*);
 } libwebsock_context;
 
+#ifdef WEBSOCK_HAVE_SSL
 typedef struct _libwebsock_ssl_event_data {
 	SSL_CTX *ssl_ctx;
 	libwebsock_context *ctx;
 } libwebsock_ssl_event_data;
-
+#endif
 
 
 //function defs
@@ -106,7 +113,6 @@ void libwebsock_handle_signal(evutil_socket_t sig, short event, void *ptr);
 void libwebsock_handle_control_frame(libwebsock_client_state *state, libwebsock_frame *ctl_frame);
 void libwebsock_dispatch_message(libwebsock_client_state *state, libwebsock_frame *current);
 void libwebsock_dump_frame(libwebsock_frame *frame);
-void libwebsock_handle_accept_ssl(evutil_socket_t listener, short event, void *arg);
 void libwebsock_handle_accept(evutil_socket_t listener, short event, void *arg);
 void libwebsock_handle_recv(struct bufferevent *bev, void *ptr);
 void libwebsock_handle_client_event(libwebsock_context *ctx, libwebsock_client_state *state);
@@ -116,6 +122,11 @@ void libwebsock_wait(libwebsock_context *ctx);
 void libwebsock_handshake_finish(struct bufferevent *bev, libwebsock_client_state *state);
 void libwebsock_handshake(struct bufferevent *bev, void *ptr);
 void libwebsock_bind(libwebsock_context *ctx, char *listen_host, char *port);
+libwebsock_context *libwebsock_init(void);
+
+#ifdef WEBSOCK_HAVE_SSL
 void libwebsock_bind_ssl(libwebsock_context *ctx, char *listen_host, char *port, char *keyfile, char *certfile);
 void libwebsock_bind_ssl_real(libwebsock_context *ctx, char *listen_host, char *port, char *keyfile, char *certfile, char *chainfile);
-libwebsock_context *libwebsock_init(void);
+void libwebsock_handle_accept_ssl(evutil_socket_t listener, short event, void *arg);
+#endif
+
