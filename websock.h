@@ -97,7 +97,7 @@ void libwebsock_handle_accept(evutil_socket_t listener, short event, void *arg);
 void libwebsock_handle_recv(struct bufferevent *bev, void *ptr);
 void libwebsock_handle_client_event(libwebsock_context *ctx, libwebsock_client_state *state);
 void libwebsock_do_read(struct bufferevent *bev, void *ptr);
-void libwebsock_do_error(struct bufferevent *bev, short error, void *ptr);
+void libwebsock_do_event(struct bufferevent *bev, short event, void *ptr);
 void libwebsock_wait(libwebsock_context *ctx);
 void libwebsock_handshake_finish(struct bufferevent *bev, libwebsock_client_state *state);
 void libwebsock_handshake(struct bufferevent *bev, void *ptr);

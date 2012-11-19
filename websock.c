@@ -55,7 +55,7 @@ void libwebsock_handle_accept_ssl(evutil_socket_t listener, short event, void *a
 		evutil_make_socket_nonblocking(fd);
 		bev = bufferevent_openssl_socket_new(ctx->base, -1, client_state->ssl, BUFFEREVENT_SSL_OPEN, BEV_OPT_CLOSE_ON_FREE);
 		client_state->bev = bev;
-		bufferevent_setcb(bev, libwebsock_handshake, NULL, libwebsock_do_error, (void *)client_state);
+		bufferevent_setcb(bev, libwebsock_handshake, NULL, libwebsock_do_event, (void *)client_state);
 		bufferevent_setwatermark(bev, EV_READ, 0, 16384);
 		bufferevent_enable(bev, EV_READ | EV_WRITE);
 	}
@@ -95,23 +95,26 @@ void libwebsock_handle_accept(evutil_socket_t listener, short event, void *arg) 
 		evutil_make_socket_nonblocking(fd);
 		bev = bufferevent_socket_new(ctx->base, fd, BEV_OPT_CLOSE_ON_FREE);
 		client_state->bev = bev;
-		bufferevent_setcb(bev, libwebsock_handshake, NULL, libwebsock_do_error, (void *)client_state);
+		bufferevent_setcb(bev, libwebsock_handshake, NULL, libwebsock_do_event, (void *)client_state);
 		bufferevent_setwatermark(bev, EV_READ, 0, 16384);
 		bufferevent_enable(bev, EV_READ | EV_WRITE);
 	}
 }
 
-void libwebsock_do_error(struct bufferevent *bev, short error, void *ptr) {
+void libwebsock_do_event(struct bufferevent *bev, short event, void *ptr) {
 	libwebsock_client_state *state = ptr;
 	libwebsock_string *str;
-	if(error & BEV_EVENT_EOF) {
-		if((state->flags & STATE_CONNECTED) && state->onclose) {
-			state->onclose(state);
-		}
-		libwebsock_free_all_frames(state);
-		if(state->sa) {
-			free(state->sa);
-		}
+
+	fprintf(stderr, "do_event called with event: %hi\n", event);
+
+	if((state->flags & STATE_CONNECTED) && state->onclose) {
+		state->onclose(state);
+	}
+	libwebsock_free_all_frames(state);
+	if(state->sa) {
+		free(state->sa);
+	}
+	if(state->flags & STATE_CONNECTING) {
 		if(state->data) {
 			str = state->data;
 			if(str->data) {
@@ -119,9 +122,8 @@ void libwebsock_do_error(struct bufferevent *bev, short error, void *ptr) {
 			}
 			free(str);
 		}
-	} else if(error & BEV_EVENT_ERROR) {
-		perror("perror in do_error");
 	}
+
 	bufferevent_free(bev);
 }
 
@@ -319,7 +321,7 @@ void libwebsock_handshake_finish(struct bufferevent *bev, libwebsock_client_stat
 	free(base64buf);
 
 	evbuffer_add(output, buf, strlen(buf));
-	bufferevent_setcb(bev, libwebsock_handle_recv, NULL, libwebsock_do_error, (void *)state);
+	bufferevent_setcb(bev, libwebsock_handle_recv, NULL, libwebsock_do_event, (void *)state);
 
 	state->flags &= ~STATE_CONNECTING;
 	state->flags |= STATE_CONNECTED;
