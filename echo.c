@@ -57,7 +57,7 @@ int onclose(libwebsock_client_state *state) {
 int main(int argc, char *argv[]) {
 	libwebsock_context *ctx = NULL;
 	if(argc != 2) {
-		fprintf(stderr, "Usage: %s <port to listen on>\n\nNote: You must be root to bind to port below 1024\n", *argv);
+		fprintf(stderr, "Usage: %s <port to listen on>\n\nNote: You must be root to bind to port below 1024\n", argv[0]);
 		exit(0);
 	}
 	
