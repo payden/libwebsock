@@ -6,7 +6,7 @@ This library allows a developer to quickly develop WebSocket servers by focusing
 on the actual logic of your WebSocket implementation instead of the details
 of the WebSocket protocol or even specifics of C sockets.
 
-To get started, have a look at [echo.c][1] in the root directory of the package.  A
+To get started, have a look at [echo.c][1] in the examples directory of the package.  A
 simple echo server is implemented.
 
 ## Features
@@ -17,5 +17,5 @@ simple echo server is implemented.
 * Uses [libevent][2] for portability (tested on Linux/FreeBSD)
 * IPv6 support
 
- [1]: https://github.com/payden/libwebsock/blob/master/echo.c
+ [1]: https://github.com/payden/libwebsock/blob/master/examples/echo.c
  [2]: http://libevent.org
