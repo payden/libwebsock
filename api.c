@@ -31,14 +31,15 @@ void libwebsock_dump_frame(libwebsock_frame *frame) {
 
 int libwebsock_send_binary(libwebsock_client_state *state, char *in_data, unsigned long long payload_len) {
 	struct evbuffer *output = bufferevent_get_output(state->bev);
-	unsigned long long payload_len_be, frame_size;
+	unsigned long long payload_len_long_be, frame_size;
+	unsigned short int payload_len_short_be;
 	unsigned char finNopcode, payload_len_small;
 	unsigned int payload_offset = 2;
 	unsigned int len_size;
 	unsigned int sent = 0;
 	int i;
 	char *data;
-	payload_len_be = htobe64(payload_len);
+
 	finNopcode = 0x82; //FIN and binary opcode.
 	if(payload_len <= 125) {
 		frame_size = 2 + payload_len;
@@ -62,13 +63,13 @@ int libwebsock_send_binary(libwebsock_client_state *state, char *in_data, unsign
 	*(data+1) = payload_len_small;
 	if(payload_len_small == 126) {
 		payload_len &= 0xffff;
-		len_size = 2;
-		memcpy(data+2, &payload_len_be, len_size);
+		payload_len_short_be = htobe16(payload_len);
+		memcpy(data+2, &payload_len_short_be, 2);
 	}
 	if(payload_len_small == 127) {
 		payload_len &= 0xffffffffffffffffLL;
-		len_size = 8;
-		memcpy(data+2, &payload_len_be, len_size);
+		payload_len_long_be = htobe64(payload_len);
+		memcpy(data+2, &payload_len_long_be, 8);
 	}
 	memcpy(data+payload_offset, in_data, payload_len);
 
@@ -85,7 +86,8 @@ int libwebsock_send_text(libwebsock_client_state *state, char *strdata)  {
 	}
 
 	struct evbuffer *output = bufferevent_get_output(state->bev);
-	unsigned long long payload_len, payload_len_be;
+	unsigned long long payload_len, payload_len_long_be;
+	unsigned short int payload_len_short_be;
 	unsigned char finNopcode, payload_len_small;
 	unsigned int payload_offset = 2;
 	unsigned int len_size;
@@ -95,13 +97,12 @@ int libwebsock_send_text(libwebsock_client_state *state, char *strdata)  {
 	int i;
 	char *data;
 	payload_len = strlen(strdata);
-	payload_len_be = htobe64(payload_len);
 
-	fprintf(stderr, "\n");
+
 	finNopcode = 0x81; //FIN and text opcode.
 	if(payload_len <= 125) {
 		frame_size = 2 + payload_len;
-		payload_len_small = payload_len;
+		payload_len_small = payload_len & 0xff;
 	} else if(payload_len > 125 && payload_len <= 0xffff) {
 		frame_size = 4 + payload_len;
 		payload_len_small = 126;
@@ -121,13 +122,13 @@ int libwebsock_send_text(libwebsock_client_state *state, char *strdata)  {
 	*(data+1) = payload_len_small;
 	if(payload_len_small == 126) {
 		payload_len &= 0xffff;
-		len_size = 2;
-		memcpy(data+2, &payload_len_be, len_size);
+		payload_len_short_be = htobe16(payload_len);
+		memcpy(data+2, &payload_len_short_be, 2);
 	}
 	if(payload_len_small == 127) {
 		payload_len &= 0xffffffffffffffffLL;
-		len_size = 8;
-		memcpy(data+2, &payload_len_be, len_size);
+		payload_len_long_be = htobe64(payload_len);
+		memcpy(data+2, &payload_len_long_be, 8);
 	}
 	memcpy(data+payload_offset, strdata, strlen(strdata));
 
