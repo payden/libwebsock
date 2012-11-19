@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <netdb.h>
-#include <sys/epoll.h>
 #include <signal.h>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
