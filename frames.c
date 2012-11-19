@@ -69,7 +69,7 @@ int libwebsock_complete_frame(libwebsock_frame *frame) {
 			return 0;
 		}
 		for(i = 0; i < 2; i++) {
-			memcpy((void *)&payload_len+i, frame->rawdata+3-i, 1);
+			*((char *)&payload_len+i) = *(frame->rawdata+3-i);
 		}
 		frame->mask_offset += 2;
 		frame->payload_len = payload_len;
@@ -79,7 +79,7 @@ int libwebsock_complete_frame(libwebsock_frame *frame) {
 			return 0;
 		}
 		for(i = 0; i < 8; i++) {
-			memcpy((void *)&payload_len+i, frame->rawdata+9-i, 1);
+			*((char *)&payload_len+i) = *(frame->rawdata+9-i);
 		}
 		frame->mask_offset += 8;
 		frame->payload_len = payload_len;
