@@ -5,8 +5,8 @@ AC_PREREQ([2.60])
 AC_INIT([libwebsock], [1.0.0], [payden@paydensutherland.com])
 AM_INIT_AUTOMAKE
 LT_INIT([disable-static])
-AC_CONFIG_SRCDIR([websock.c])
-AC_CONFIG_HEADERS([config.h])
+AC_CONFIG_SRCDIR([src/websock.c])
+AC_CONFIG_HEADERS([src/config.h])
 AC_CONFIG_MACRO_DIR([m4])
 # Checks for programs.
 AC_PROG_CC
@@ -56,5 +56,5 @@ AS_IF([test "x$have_ssl" = "xyes"],
   	
 AM_CONDITIONAL([HAVE_SSL], [test "x$have_ssl" = "xyes"])
 
-AC_CONFIG_FILES([Makefile])
+AC_CONFIG_FILES([Makefile src/Makefile examples/Makefile])
 AC_OUTPUT

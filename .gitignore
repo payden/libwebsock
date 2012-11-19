@@ -3,7 +3,7 @@
 Makefile.in
 Makefile
 # http://www.gnu.org/software/autoconf
-
+/examples/echo
 /autom4te.cache
 /aclocal.m4
 /compile
@@ -25,7 +25,7 @@ Makefile
 
 *.html
 /autom4te.cache
-/stamp-h1
+stamp-h1
 Makefile
 /config.status
 /config.log
