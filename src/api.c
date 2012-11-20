@@ -48,10 +48,6 @@ void libwebsock_wait(libwebsock_context *ctx) {
 	event_free(sig_event);
 }
 
-void libwebsock_cleanup_context(libwebsock_context *ctx) {
-	free(ctx);
-}
-
 void libwebsock_bind(libwebsock_context *ctx, char *listen_host, char *port) {
 	struct addrinfo hints, *servinfo, *p;
 	struct event *listener_event;
@@ -124,8 +120,9 @@ libwebsock_context *libwebsock_init(void) {
 
 	ctx->base = event_base_new();
 	if(!ctx->base) {
+		free(ctx);
 		fprintf(stderr, "Unable to create new event base.\n");
-		exit(1);
+		return NULL;
 	}
 
 	return ctx;
