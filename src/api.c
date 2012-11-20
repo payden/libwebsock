@@ -27,64 +27,20 @@ void libwebsock_dump_frame(libwebsock_frame *frame) {
 	fprintf(stderr, "\n");
 }
 
-int libwebsock_send_binary(libwebsock_client_state *state, char *in_data, unsigned long long payload_len) {
-	struct evbuffer *output = bufferevent_get_output(state->bev);
-	unsigned long long payload_len_long_be, frame_size;
-	unsigned short int payload_len_short_be;
-	unsigned char finNopcode, payload_len_small;
-	unsigned int payload_offset = 2;
-	unsigned int len_size;
-	unsigned int sent = 0;
-	int i;
-	char *data;
-
-	finNopcode = 0x82; //FIN and binary opcode.
-	if(payload_len <= 125) {
-		frame_size = 2 + payload_len;
-		payload_len_small = payload_len;
-	} else if(payload_len > 125 && payload_len <= 0xffff) {
-		frame_size = 4 + payload_len;
-		payload_len_small = 126;
-		payload_offset += 2;
-	} else if(payload_len > 0xffff && payload_len <= 0xffffffffffffffffLL) {
-		frame_size = 10 + payload_len;
-		payload_len_small = 127;
-		payload_offset += 8;
-	} else {
-		fprintf(stderr, "Whoa man.  What are you trying to send?\n");
-		return -1;
-	}
-	data = (char *)malloc(frame_size);
-	memset(data, 0, frame_size);
-	payload_len_small &= 0x7f;
-	*data = finNopcode;
-	*(data+1) = payload_len_small;
-	if(payload_len_small == 126) {
-		payload_len &= 0xffff;
-		payload_len_short_be = htobe16(payload_len);
-		memcpy(data+2, &payload_len_short_be, 2);
-	}
-	if(payload_len_small == 127) {
-		payload_len &= 0xffffffffffffffffLL;
-		payload_len_long_be = htobe64(payload_len);
-		memcpy(data+2, &payload_len_long_be, 8);
-	}
-	memcpy(data+payload_offset, in_data, payload_len);
-
-	sent = evbuffer_add(output, data, frame_size);
-
-	free(data);
-	return sent;
+int libwebsock_send_text(libwebsock_client_state *state, char *strdata) {
+	unsigned long long len = strlen(strdata);
+	int flags = WS_FRAGMENT_FIN | WS_OPCODE_TEXT;
+	return libwebsock_send_fragment(state, strdata, len, flags);
 }
 
-int libwebsock_send_text(libwebsock_client_state *state, char *strdata)  {
-	if(strdata == NULL) {
-		fprintf(stderr, "Will not send empty message.\n");
-		return -1;
-	}
+int libwebsock_send_binary(libwebsock_client_state *state, char *in_data, unsigned long long payload_len) {
+	int flags = WS_FRAGMENT_FIN | WS_OPCODE_BINARY;
+	return libwebsock_send_fragment(state, in_data, payload_len, flags);
+}
 
+int libwebsock_send_fragment(libwebsock_client_state *state, char *data, unsigned long long len, int flags)  {
 	struct evbuffer *output = bufferevent_get_output(state->bev);
-	unsigned long long payload_len, payload_len_long_be;
+	unsigned long long payload_len_long_be;
 	unsigned short int payload_len_short_be;
 	unsigned char finNopcode, payload_len_small;
 	unsigned int payload_offset = 2;
@@ -93,46 +49,44 @@ int libwebsock_send_text(libwebsock_client_state *state, char *strdata)  {
 	unsigned int sent = 0;
 	unsigned int frame_size;
 	int i;
-	char *data;
-	payload_len = strlen(strdata);
+	char *frame;
 
-
-	finNopcode = 0x81; //FIN and text opcode.
-	if(payload_len <= 125) {
-		frame_size = 2 + payload_len;
-		payload_len_small = payload_len & 0xff;
-	} else if(payload_len > 125 && payload_len <= 0xffff) {
-		frame_size = 4 + payload_len;
+	finNopcode = flags & 0xff;
+	if(len <= 125) {
+		frame_size = 2 + len;
+		payload_len_small = len & 0xff;
+	} else if(len > 125 && len <= 0xffff) {
+		frame_size = 4 + len;
 		payload_len_small = 126;
 		payload_offset += 2;
-	} else if(payload_len > 0xffff && payload_len <= 0xffffffffffffffffLL) {
-		frame_size = 10 + payload_len;
+	} else if(len > 0xffff && len <= 0xffffffffffffffffLL) {
+		frame_size = 10 + len;
 		payload_len_small = 127;
 		payload_offset += 8;
 	} else {
 		fprintf(stderr, "Whoa man.  What are you trying to send?\n");
 		return -1;
 	}
-	data = (char *)malloc(frame_size);
-	memset(data, 0, frame_size);
+	frame = (char *)malloc(frame_size);
+	memset(frame, 0, frame_size);
 	payload_len_small &= 0x7f;
-	*data = finNopcode;
-	*(data+1) = payload_len_small;
+	*frame = finNopcode;
+	*(frame+1) = payload_len_small;
 	if(payload_len_small == 126) {
-		payload_len &= 0xffff;
-		payload_len_short_be = htobe16(payload_len);
-		memcpy(data+2, &payload_len_short_be, 2);
+		len &= 0xffff;
+		payload_len_short_be = htobe16(len);
+		memcpy(frame+2, &payload_len_short_be, 2);
 	}
 	if(payload_len_small == 127) {
-		payload_len &= 0xffffffffffffffffLL;
-		payload_len_long_be = htobe64(payload_len);
-		memcpy(data+2, &payload_len_long_be, 8);
+		len &= 0xffffffffffffffffLL;
+		payload_len_long_be = htobe64(len);
+		memcpy(frame+2, &payload_len_long_be, 8);
 	}
-	memcpy(data+payload_offset, strdata, strlen(strdata));
+	memcpy(frame+payload_offset, data, len);
 
-	sent = evbuffer_add(output, data, frame_size);
+	sent = evbuffer_add(output, frame, frame_size);
 
-	free(data);
+	free(frame);
 	return sent;
 }
 

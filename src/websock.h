@@ -29,6 +29,14 @@
 #define FRAME_CHUNK_LENGTH 1024
 #define MASK_LENGTH 4
 
+#define WS_FRAGMENT_FIN (1 << 7)
+
+#define WS_OPCODE_TEXT 0x1
+#define WS_OPCODE_BINARY 0x2
+#define WS_OPCODE_CLOSE 0x8
+#define WS_OPCODE_PING 0x9
+#define WS_OPCODE_PONG 0xa
+
 
 #define STATE_SHOULD_CLOSE (1 << 0)
 #define STATE_SENT_CLOSE_FRAME (1 << 1)
@@ -114,6 +122,7 @@ void libwebsock_handle_control_frame(libwebsock_client_state *state, libwebsock_
 void libwebsock_dispatch_message(libwebsock_client_state *state, libwebsock_frame *current);
 void libwebsock_dump_frame(libwebsock_frame *frame);
 void libwebsock_handle_accept(evutil_socket_t listener, short event, void *arg);
+void libwebsock_handle_send(struct bufferevent *bev, void *ptr);
 void libwebsock_handle_recv(struct bufferevent *bev, void *ptr);
 void libwebsock_handle_client_event(libwebsock_context *ctx, libwebsock_client_state *state);
 void libwebsock_do_read(struct bufferevent *bev, void *ptr);
