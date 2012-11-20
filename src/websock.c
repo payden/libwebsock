@@ -12,10 +12,32 @@ void libwebsock_handle_signal(evutil_socket_t sig, short event, void *ptr) {
 	event_base_loopexit(ctx->base, NULL);
 }
 
+void libwebsock_populate_close_info_from_frame(libwebsock_close_info **info, libwebsock_frame *close_frame) {
+	libwebsock_close_info *new_info;
+	unsigned short code_be;
+
+	new_info = (libwebsock_close_info *)malloc(sizeof(libwebsock_close_info));
+	if(!new_info) {
+		fprintf(stderr, "Error allocating memory for libwebsock_close_info structure.\n");
+		return;
+	}
+
+	memset(new_info, 0, sizeof(libwebsock_close_info));
+	memcpy(&code_be, close_frame->rawdata + close_frame->payload_offset, 2);
+	new_info->code = be16toh(code_be);
+	if(close_frame->payload_len - 2 > 0) {
+		snprintf(new_info->reason, 124, "%s", close_frame->rawdata + close_frame->payload_offset + 2);
+	}
+	*info = new_info;
+}
+
 void libwebsock_shutdown(libwebsock_client_state *state) {
 	libwebsock_string *str;
 	if((state->flags & STATE_CONNECTED) && state->onclose) {
 		state->onclose(state);
+	}
+	if(state->close_info) {
+		free(state->close_info);
 	}
 	libwebsock_free_all_frames(state);
 	if(state->sa) {

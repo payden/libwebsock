@@ -35,12 +35,12 @@ int libwebsock_close_with_reason(libwebsock_client_state *state, short code, con
 	unsigned long long len;
 	short code_be;
 	int ret;
-	char buf[1024]; //honestly I don't see close frames being over 1024 bytes.  Truncate them if so.
+	char buf[128]; //w3 spec on WebSockets API (http://dev.w3.org/html5/websockets/) says reason shouldn't be over 123 bytes.  I concur.
 	len = 2;
 	code_be = htobe16(code);
 	memcpy(buf, &code_be, 2);
 	if(reason) {
-		len += snprintf(buf+2, 1022, "%s", reason);
+		len += snprintf(buf+2, 124, "%s", reason);
 	}
 	int flags = WS_FRAGMENT_FIN | WS_OPCODE_CLOSE;
 	ret = libwebsock_send_fragment(state, buf, len, flags);

@@ -81,6 +81,11 @@ typedef struct _libwebsock_message {
 	char *payload;
 } libwebsock_message;
 
+typedef struct _libwebsock_close_info {
+	unsigned short code;
+	char reason[124];
+} libwebsock_close_info;
+
 typedef struct _libwebsock_client_state {
 	int sockfd;
 	int flags;
@@ -88,23 +93,24 @@ typedef struct _libwebsock_client_state {
 	libwebsock_frame *current_frame;
 	struct sockaddr_storage *sa;
 	struct bufferevent *bev;
-	int (*onmessage)(struct _libwebsock_client_state*, libwebsock_message*);
-	int (*control_callback)(struct _libwebsock_client_state*, libwebsock_frame*);
-	int (*onopen)(struct _libwebsock_client_state*);
-	int (*onclose)(struct _libwebsock_client_state*);
+	int (*onmessage)(struct _libwebsock_client_state *, libwebsock_message *);
+	int (*control_callback)(struct _libwebsock_client_state *, libwebsock_frame *);
+	int (*onopen)(struct _libwebsock_client_state *);
+	int (*onclose)(struct _libwebsock_client_state *);
 #ifdef WEBSOCK_HAVE_SSL
 	SSL *ssl;
 #endif
+	libwebsock_close_info *close_info;
 } libwebsock_client_state;
 
 typedef struct _libwebsock_context {
 	int running;
 	int ssl_init;
 	struct event_base *base;
-	int (*onmessage)(libwebsock_client_state*, libwebsock_message*);
-	int (*control_callback)(libwebsock_client_state*, libwebsock_frame*);
-	int (*onopen)(libwebsock_client_state*);
-	int (*onclose)(libwebsock_client_state*);
+	int (*onmessage)(libwebsock_client_state *, libwebsock_message *);
+	int (*control_callback)(libwebsock_client_state *, libwebsock_frame *);
+	int (*onopen)(libwebsock_client_state *);
+	int (*onclose)(libwebsock_client_state *);
 } libwebsock_context;
 
 #ifdef WEBSOCK_HAVE_SSL
@@ -127,6 +133,7 @@ int libwebsock_default_onclose_callback(libwebsock_client_state *state);
 int libwebsock_default_onopen_callback(libwebsock_client_state *state);
 int libwebsock_default_onmessage_callback(libwebsock_client_state *state, libwebsock_message *msg);
 int libwebsock_default_control_callback(libwebsock_client_state *state, libwebsock_frame *ctl_frame);
+void libwebsock_populate_close_info_from_frame(libwebsock_close_info **info, libwebsock_frame *close_frame);
 void libwebsock_fail_connection(libwebsock_client_state *state);
 void libwebsock_cleanup_context(libwebsock_context *ctx);
 void libwebsock_handle_signal(evutil_socket_t sig, short event, void *ptr);
