@@ -37,6 +37,15 @@
 #define WS_OPCODE_PING 0x9
 #define WS_OPCODE_PONG 0xa
 
+#define WS_CLOSE_NORMAL 1000
+#define WS_CLOSE_GOING_AWAY 1001
+#define WS_CLOSE_PROTOCOL_ERROR 1002
+#define WS_CLOSE_NOT_ALLOWED 1003
+#define WS_CLOSE_WRONG_TYPE 1007
+#define WS_CLOSE_POLICY_VIOLATION 1008
+#define WS_CLOSE_MESSAGE_TOO_BIG 1009
+#define WS_CLOSE_UNEXPECTED_ERROR 1011
+
 
 #define STATE_SHOULD_CLOSE (1 << 0)
 #define STATE_SENT_CLOSE_FRAME (1 << 1)
@@ -108,7 +117,9 @@ typedef struct _libwebsock_ssl_event_data {
 
 //function defs
 
-int libwebsock_send_fragment(libwebsock_client_state *state, char *data, unsigned long long len, int flags);
+int libwebsock_close(libwebsock_client_state *state);
+int libwebsock_close_with_reason(libwebsock_client_state *state, short code, const char *reason);
+int libwebsock_send_fragment(libwebsock_client_state *state, const char *data, unsigned long long len, int flags);
 int libwebsock_send_binary(libwebsock_client_state *state, char *in_data, unsigned long long payload_len);
 int libwebsock_send_text(libwebsock_client_state *state, char *strdata);
 int libwebsock_complete_frame(libwebsock_frame *frame);

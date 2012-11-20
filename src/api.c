@@ -27,6 +27,27 @@ void libwebsock_dump_frame(libwebsock_frame *frame) {
 	fprintf(stderr, "\n");
 }
 
+int libwebsock_close(libwebsock_client_state *state) {
+	return libwebsock_close_with_reason(state, WS_CLOSE_NORMAL, NULL);
+}
+
+int libwebsock_close_with_reason(libwebsock_client_state *state, short code, const char *reason) {
+	unsigned long long len;
+	short code_be;
+	int ret;
+	char buf[1024]; //honestly I don't see close frames being over 1024 bytes.  Truncate them if so.
+	len = 2;
+	code_be = htobe16(code);
+	memcpy(buf, &code_be, 2);
+	if(reason) {
+		len += snprintf(buf+2, 1022, "%s", reason);
+	}
+	int flags = WS_FRAGMENT_FIN | WS_OPCODE_CLOSE;
+	ret = libwebsock_send_fragment(state, buf, len, flags);
+	state->flags |= STATE_SENT_CLOSE_FRAME;
+	return ret;
+}
+
 int libwebsock_send_text(libwebsock_client_state *state, char *strdata) {
 	unsigned long long len = strlen(strdata);
 	int flags = WS_FRAGMENT_FIN | WS_OPCODE_TEXT;

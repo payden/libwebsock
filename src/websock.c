@@ -44,7 +44,7 @@ void libwebsock_handle_send(struct bufferevent *bev, void *arg) {
 
 }
 
-int libwebsock_send_fragment(libwebsock_client_state *state, char *data, unsigned long long len, int flags)  {
+int libwebsock_send_fragment(libwebsock_client_state *state, const char *data, unsigned long long len, int flags)  {
 	struct evbuffer *output = bufferevent_get_output(state->bev);
 	unsigned long long payload_len_long_be;
 	unsigned short int payload_len_short_be;
