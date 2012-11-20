@@ -38,58 +38,6 @@ int libwebsock_send_binary(libwebsock_client_state *state, char *in_data, unsign
 	return libwebsock_send_fragment(state, in_data, payload_len, flags);
 }
 
-int libwebsock_send_fragment(libwebsock_client_state *state, char *data, unsigned long long len, int flags)  {
-	struct evbuffer *output = bufferevent_get_output(state->bev);
-	unsigned long long payload_len_long_be;
-	unsigned short int payload_len_short_be;
-	unsigned char finNopcode, payload_len_small;
-	unsigned int payload_offset = 2;
-	unsigned int len_size;
-	unsigned long long be_payload_len;
-	unsigned int sent = 0;
-	unsigned int frame_size;
-	int i;
-	char *frame;
-
-	finNopcode = flags & 0xff;
-	if(len <= 125) {
-		frame_size = 2 + len;
-		payload_len_small = len & 0xff;
-	} else if(len > 125 && len <= 0xffff) {
-		frame_size = 4 + len;
-		payload_len_small = 126;
-		payload_offset += 2;
-	} else if(len > 0xffff && len <= 0xffffffffffffffffLL) {
-		frame_size = 10 + len;
-		payload_len_small = 127;
-		payload_offset += 8;
-	} else {
-		fprintf(stderr, "Whoa man.  What are you trying to send?\n");
-		return -1;
-	}
-	frame = (char *)malloc(frame_size);
-	memset(frame, 0, frame_size);
-	payload_len_small &= 0x7f;
-	*frame = finNopcode;
-	*(frame+1) = payload_len_small;
-	if(payload_len_small == 126) {
-		len &= 0xffff;
-		payload_len_short_be = htobe16(len);
-		memcpy(frame+2, &payload_len_short_be, 2);
-	}
-	if(payload_len_small == 127) {
-		len &= 0xffffffffffffffffLL;
-		payload_len_long_be = htobe64(len);
-		memcpy(frame+2, &payload_len_long_be, 8);
-	}
-	memcpy(frame+payload_offset, data, len);
-
-	sent = evbuffer_add(output, frame, frame_size);
-
-	free(frame);
-	return sent;
-}
-
 void libwebsock_wait(libwebsock_context *ctx) {
 	struct event *sig_event;
 	sig_event = evsignal_new(ctx->base, SIGINT, libwebsock_handle_signal, (void *)ctx);
