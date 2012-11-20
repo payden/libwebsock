@@ -210,7 +210,6 @@ void libwebsock_handshake_finish(struct bufferevent *bev, libwebsock_client_stat
 	char *tok = NULL, *headers = NULL, *key = NULL;
 	char *base64buf = NULL;
 	const char *GID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
-	int sockfd = state->sockfd;
 	SHA1Context shactx;
 	SHA1Reset(&shactx);
 	int n = 0;
@@ -221,7 +220,7 @@ void libwebsock_handshake_finish(struct bufferevent *bev, libwebsock_client_stat
 	headers = (char *)malloc(str->data_sz + 1);
 	if(!headers) {
 		fprintf(stderr, "Unable to allocate memory in libwebsock_handshake..\n");
-		close(sockfd);
+		bufferevent_free(bev);
 		return;
 	}
 	memset(headers, 0, str->data_sz + 1);
@@ -241,7 +240,7 @@ void libwebsock_handshake_finish(struct bufferevent *bev, libwebsock_client_stat
 	
 	if(key == NULL) {
 		fprintf(stderr, "Unable to find key in request headers.\n");
-		close(sockfd);
+		bufferevent_free(bev);
 		return;
 	}
 
@@ -259,7 +258,10 @@ void libwebsock_handshake_finish(struct bufferevent *bev, libwebsock_client_stat
 	base64buf = (char *)malloc(256);
 	base64_encode(sha1mac, 20, base64buf, 256);
 	memset(buf, 0, 1024);
-	snprintf(buf, 1024, "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: %s\r\n\r\n", base64buf);
+	snprintf(buf, 1024, "HTTP/1.1 101 Switching Protocols\r\n"
+						"Upgrade: websocket\r\n"
+						"Connection: Upgrade\r\n"
+						"Sec-WebSocket-Accept: %s\r\n\r\n", base64buf);
 	free(base64buf);
 
 	evbuffer_add(output, buf, strlen(buf));
@@ -285,7 +287,7 @@ void libwebsock_handshake(struct bufferevent *bev, void *ptr) {
 		state->data = (libwebsock_string *)malloc(sizeof(libwebsock_string));
 		if(!state->data) {
 			fprintf(stderr, "Unable to allocate memory in libwebsock_handshake.\n");
-			close(state->sockfd);
+			bufferevent_free(bev);
 			return;
 		}
 		str = state->data;
@@ -294,7 +296,7 @@ void libwebsock_handshake(struct bufferevent *bev, void *ptr) {
 		str->data = (char *)malloc(str->data_sz);
 		if(!str->data) {
 			fprintf(stderr, "Unable to allocate memory in libwebsock_handshake.\n");
-			close(state->sockfd);
+			bufferevent_free(bev);
 			return;
 		}
 		memset(str->data, 0, str->data_sz);
@@ -308,7 +310,7 @@ void libwebsock_handshake(struct bufferevent *bev, void *ptr) {
 			str->data = realloc(str->data, str->data_sz + FRAME_CHUNK_LENGTH);
 			if(!str->data) {
 				fprintf(stderr, "Failed realloc.\n");
-				close(state->sockfd);
+				bufferevent_free(bev);
 				return;
 			}
 			str->data_sz += FRAME_CHUNK_LENGTH;

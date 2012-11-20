@@ -176,9 +176,8 @@ void libwebsock_bind(libwebsock_context *ctx, char *listen_host, char *port) {
 
 		if(setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
 			perror("setsockopt");
-			free(ctx);
-			exit(-1);
 		}
+
 		if(bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
 			perror("bind");
 			close(sockfd);
@@ -216,10 +215,10 @@ libwebsock_context *libwebsock_init(void) {
 	memset(ctx, 0, sizeof(libwebsock_context));
 
 
-	ctx->onclose = &libwebsock_default_onclose_callback;
-	ctx->onopen = &libwebsock_default_onopen_callback;
-	ctx->control_callback = &libwebsock_default_control_callback;
-	ctx->onmessage = &libwebsock_default_onmessage_callback;
+	ctx->onclose = libwebsock_default_onclose_callback;
+	ctx->onopen = libwebsock_default_onopen_callback;
+	ctx->control_callback = libwebsock_default_control_callback;
+	ctx->onmessage = libwebsock_default_onmessage_callback;
 
 	ctx->base = event_base_new();
 	if(!ctx->base) {
