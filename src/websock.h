@@ -124,7 +124,7 @@ typedef struct _libwebsock_ssl_event_data {
 //function defs
 
 int libwebsock_close(libwebsock_client_state *state);
-int libwebsock_close_with_reason(libwebsock_client_state *state, short code, const char *reason);
+int libwebsock_close_with_reason(libwebsock_client_state *state, unsigned short code, const char *reason);
 int libwebsock_send_fragment(libwebsock_client_state *state, const char *data, unsigned long long len, int flags);
 int libwebsock_send_binary(libwebsock_client_state *state, char *in_data, unsigned long long payload_len);
 int libwebsock_send_text(libwebsock_client_state *state, char *strdata);

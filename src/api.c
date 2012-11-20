@@ -31,9 +31,9 @@ int libwebsock_close(libwebsock_client_state *state) {
 	return libwebsock_close_with_reason(state, WS_CLOSE_NORMAL, NULL);
 }
 
-int libwebsock_close_with_reason(libwebsock_client_state *state, short code, const char *reason) {
+int libwebsock_close_with_reason(libwebsock_client_state *state, unsigned short code, const char *reason) {
 	unsigned long long len;
-	short code_be;
+	unsigned short code_be;
 	int ret;
 	char buf[128]; //w3 spec on WebSockets API (http://dev.w3.org/html5/websockets/) says reason shouldn't be over 123 bytes.  I concur.
 	len = 2;
