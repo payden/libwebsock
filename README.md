@@ -9,6 +9,8 @@ of the WebSocket protocol or even specifics of C sockets.
 To get started, have a look at [echo.c][1] in the examples directory of the package.  A
 simple echo server is implemented.
 
+You can find the latest autobahn test results [here][3].
+
 ## Features
 
 * Callbacks for events
@@ -19,3 +21,4 @@ simple echo server is implemented.
 
  [1]: https://github.com/payden/libwebsock/blob/master/examples/echo.c
  [2]: http://libevent.org
+ [3]: http://paydensutherland.com/autobahn
