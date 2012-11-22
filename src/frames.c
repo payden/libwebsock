@@ -49,11 +49,10 @@ void libwebsock_handle_control_frame(libwebsock_client_state *state, libwebsock_
 	// It should be noted that ctl_frame is still state->current_frame after this function returns.
 	// So even though the below refers to ctl_frame, I'm really setting up state->current_frame to continue receiving data on the next go 'round
 	ptr = ctl_frame->prev_frame; //This very well may be a NULL pointer, but just in case we preserve it.
-	free(ctl_frame->rawdata);
-	memset(ctl_frame, 0, sizeof(libwebsock_frame));
 	ctl_frame->prev_frame = ptr;
-	ctl_frame->rawdata = (char *)malloc(FRAME_CHUNK_LENGTH);
-	memset(ctl_frame->rawdata, 0, FRAME_CHUNK_LENGTH);
+	//should be able to reuse this frame by setting these two members to zero.  Avoid free/malloc of rawdata
+	ctl_frame->state = 0;
+	ctl_frame->rawdata_idx = 0;
 }
 
 void libwebsock_cleanup_frames(libwebsock_frame *first) {
@@ -70,46 +69,73 @@ void libwebsock_cleanup_frames(libwebsock_frame *first) {
 }
 
 int libwebsock_complete_frame(libwebsock_frame *frame) {
-	int payload_len_short, i;
-	unsigned long long payload_len = 0;
-	if(frame->rawdata_idx < 2) {
-		return 0;
-	}
-	frame->mask_offset = 2;
-	frame->fin = (*(frame->rawdata) & 0x80) == 0x80 ? 1 : 0;
-	frame->opcode = *(frame->rawdata) & 0x0f;
-	if((*(frame->rawdata+1) & 0x80) != 0x80) { //unmasked frame, fail connection.
-		return -1;
-	}
-	payload_len_short = *(frame->rawdata+1) & 0x7f;
-	switch(payload_len_short) {
-	case 126:
-		if(frame->rawdata_idx < 4) {
-			return 0;
-		}
-		payload_len = be16toh(*((unsigned short int *)(frame->rawdata+2)));
-		frame->mask_offset += 2;
-		frame->payload_len = payload_len;
-		break;
-	case 127:
-		if(frame->rawdata_idx < 10) {
-			return 0;
-		}
-		payload_len = be64toh(*((unsigned long long *)(frame->rawdata+2)));
-		frame->mask_offset += 8;
-		frame->payload_len = payload_len;
-		break;
-	default:
-		frame->payload_len = payload_len_short;
-		break;
+	int i;
+	enum {
+		sw_start = 0,
+		sw_got_two,
+		sw_got_short_len,
+		sw_got_full_len,
 
+
+	} state;
+
+	state = frame->state;
+	switch(state) {
+		case sw_start:
+			if(frame->rawdata_idx < 2) {
+				break;
+			}
+			frame->state = sw_got_two;
+			break;
+		case sw_got_two:
+			if((*(frame->rawdata) & 0x70) != 0) { //some reserved bits were set
+				return -1;
+			}
+			if((*(frame->rawdata+1) & 0x80) != 0x80) {
+							return -1;
+			}
+			frame->mask_offset = 2;
+			frame->fin = (*(frame->rawdata) & 0x80) == 0x80 ? 1 : 0;
+			frame->opcode = *(frame->rawdata) & 0xf;
+			frame->payload_len_short = *(frame->rawdata+1) & 0x7f;
+			frame->state = sw_got_short_len;
+			break;
+		case sw_got_short_len:
+			switch(frame->payload_len_short) {
+				case 126:
+					if(frame->rawdata_idx < 4) {
+						break;
+					}
+					frame->mask_offset += 2;
+					frame->payload_offset = frame->mask_offset + MASK_LENGTH;
+					frame->payload_len = be16toh(*((unsigned short int *)(frame->rawdata+2)));
+					frame->state = sw_got_full_len;
+					break;
+				case 127:
+					if(frame->rawdata_idx < 10) {
+						break;
+					}
+					frame->mask_offset += 8;
+					frame->payload_offset = frame->mask_offset + MASK_LENGTH;
+					frame->payload_len = be64toh(*((unsigned long long *)(frame->rawdata+2)));
+					frame->state = sw_got_full_len;
+					break;
+				default:
+					frame->payload_len = frame->payload_len_short;
+					frame->payload_offset = frame->mask_offset + MASK_LENGTH;
+					frame->state = sw_got_full_len;
+					break;
+			}
+			break;
+		case sw_got_full_len:
+			if(frame->rawdata_idx < frame->payload_offset + frame->payload_len) {
+				break;
+			}
+			for(i = 0; i < MASK_LENGTH; i++) {
+				frame->mask[i] = *(frame->rawdata + frame->mask_offset + i) & 0xff;
+			}
+			//libwebsock_dump_frame(frame);
+			return 1;
 	}
-	frame->payload_offset = frame->mask_offset + MASK_LENGTH;
-	if(frame->rawdata_idx < frame->payload_offset + frame->payload_len) {
-		return 0;
-	}
-	for(i = 0; i < MASK_LENGTH; i++) {
-		frame->mask[i] = *(frame->rawdata + frame->mask_offset + i) & 0xff;
-	}
-	return 1;
+	return 0; //never reached
 }

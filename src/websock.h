@@ -48,6 +48,7 @@
 
 #define WS_FRAGMENT_FIN (1 << 7)
 
+#define WS_OPCODE_CONTINUE 0x0
 #define WS_OPCODE_TEXT 0x1
 #define WS_OPCODE_BINARY 0x2
 #define WS_OPCODE_CLOSE 0x8
@@ -58,6 +59,9 @@
 #define WS_CLOSE_GOING_AWAY 1001
 #define WS_CLOSE_PROTOCOL_ERROR 1002
 #define WS_CLOSE_NOT_ALLOWED 1003
+#define WS_CLOSE_RESERVED 1004
+#define WS_CLOSE_NO_CODE 1005
+#define WS_CLOSE_DIRTY 1006
 #define WS_CLOSE_WRONG_TYPE 1007
 #define WS_CLOSE_POLICY_VIOLATION 1008
 #define WS_CLOSE_MESSAGE_TOO_BIG 1009
@@ -69,6 +73,8 @@
 #define STATE_CONNECTING (1 << 2)
 #define STATE_IS_SSL (1 << 3)
 #define STATE_CONNECTED (1 << 4)
+#define STATE_SENDING_FRAGMENT (1 << 5)
+#define STATE_RECEIVING_FRAGMENT (1 << 6)
 
 
 typedef struct _libwebsock_string {
@@ -85,11 +91,13 @@ typedef struct _libwebsock_frame {
 	unsigned int payload_offset;
 	unsigned int rawdata_idx;
 	unsigned int rawdata_sz;
+	unsigned int payload_len_short;
 	unsigned long long payload_len;
 	char *rawdata;
 	struct _libwebsock_frame *next_frame;
 	struct _libwebsock_frame *prev_frame;
 	unsigned char mask[4];
+	int state;
 } libwebsock_frame;
 
 typedef struct _libwebsock_message {
@@ -130,6 +138,15 @@ typedef struct _libwebsock_context {
 	int (*onclose)(libwebsock_client_state *);
 } libwebsock_context;
 
+
+typedef struct _libwebsock_fragmented {
+	char *send;
+	char *queued;
+	unsigned int send_len;
+	unsigned int queued_len;
+	struct _libwebsock_client_state *state;
+} libwebsock_fragmented;
+
 #ifdef WEBSOCK_HAVE_SSL
 typedef struct _libwebsock_ssl_event_data {
 	SSL_CTX *ssl_ctx;
@@ -167,6 +184,9 @@ void libwebsock_wait(libwebsock_context *ctx);
 void libwebsock_handshake_finish(struct bufferevent *bev, libwebsock_client_state *state);
 void libwebsock_handshake(struct bufferevent *bev, void *ptr);
 void libwebsock_bind(libwebsock_context *ctx, char *listen_host, char *port);
+void libwebsock_fragmented_add(libwebsock_fragmented *frag, char *buf, unsigned int len);
+void libwebsock_fragmented_finish(libwebsock_fragmented *frag);
+libwebsock_fragmented *libwebsock_fragmented_new(libwebsock_client_state *state);
 libwebsock_context *libwebsock_init(void);
 
 #ifdef WEBSOCK_HAVE_SSL
