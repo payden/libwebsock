@@ -189,6 +189,25 @@ void libwebsock_do_event(struct bufferevent *bev, short event, void *ptr) {
 	}
 }
 
+inline void libwebsock_frame_act(libwebsock_client_state *state, libwebsock_frame *frame) {
+	switch(frame->opcode) {
+		case WS_OPCODE_CLOSE:
+		case WS_OPCODE_PING:
+		case WS_OPCODE_PONG:
+			libwebsock_handle_control_frame(state, frame);
+			break;
+		case WS_OPCODE_TEXT:
+		case WS_OPCODE_BINARY:
+		case WS_OPCODE_CONTINUE:
+			libwebsock_dispatch_message(state, frame);
+			state->current_frame = NULL;
+			break;
+		default:
+			libwebsock_fail_connection(state);
+			break;
+	}
+}
+
 void libwebsock_handle_recv(struct bufferevent *bev, void *ptr) {
 	//alright... while we haven't reached the end of data keep trying to build frames
 	//possible states right now:
@@ -222,67 +241,62 @@ void libwebsock_handle_recv(struct bufferevent *bev, void *ptr) {
 			*(current->rawdata + current->rawdata_idx++) = buf[i];
 			complete_frame = libwebsock_complete_frame(current);
 			if(complete_frame == 1) {
-				if(current->fin == 1) {
-					if(state->flags & STATE_RECEIVING_FRAGMENT) {
-						if((current->opcode & 0x8) == 0 && current->opcode != WS_OPCODE_CONTINUE) {
-							//received non-ctrl FIN frame of fragmented message, but it has opcode.
+				if(state->flags & STATE_RECEIVING_FRAGMENT) {
+					if(current->fin == 1) {
+						if((current->opcode & 0x8) == 0) {
+							if(current->opcode) { //non-ctrl and has opcode in the middle of fragment.  FAIL
+								libwebsock_fail_connection(state);
+								break;
+							}
+							state->flags &= ~STATE_RECEIVING_FRAGMENT;
+						}
+						libwebsock_frame_act(state, current);
+					} else {
+						//middle of fragment non-fin frame
+						if(current->opcode) { //cannot have opcode
 							libwebsock_fail_connection(state);
 							break;
 						}
-					}
-					if(current->opcode == WS_OPCODE_CONTINUE) {
-						if((state->flags & STATE_RECEIVING_FRAGMENT) == 0) {
-							libwebsock_fail_connection(state);
-							break;
-						}
-					}
-					switch(current->opcode) {
-						case WS_OPCODE_CLOSE:
-						case WS_OPCODE_PING:
-						case WS_OPCODE_PONG:
-							libwebsock_handle_control_frame(state, current);
-							break;
-						case WS_OPCODE_TEXT:
-						case WS_OPCODE_BINARY:
-						case WS_OPCODE_CONTINUE:
-							libwebsock_dispatch_message(state, current);
-							state->current_frame = NULL;
-							break;
-						default:
-							libwebsock_fail_connection(state);
-							break;
+						new = (libwebsock_frame *)malloc(sizeof(libwebsock_frame));
+						memset(new, 0, sizeof(libwebsock_frame));
+						new->rawdata_sz = FRAME_CHUNK_LENGTH;
+						new->rawdata = (char *)malloc(new->rawdata_sz);
+						new->prev_frame = current;
+						current->next_frame = new;
+						state->current_frame = new;
 					}
 				} else {
-					if(current->opcode & 0x8) { //continuation of control frame?  FAIL
-						libwebsock_fail_connection(state);
-						break;
-					}
-					if(current->opcode) {
-						if(state->flags & STATE_RECEIVING_FRAGMENT) {
-							libwebsock_fail_connection(state); //opcode after receiving first continuation frame.  FAIL
-							break;
-						} else {
-							state->flags |= STATE_RECEIVING_FRAGMENT;
-						}
-					} else {
-						if((state->flags & STATE_RECEIVING_FRAGMENT) == 0) {
-							//nothing to continue, continuation frame without opcode when we weren't receiving fragment. FAIL
+					if(current->fin == 1) {
+						//first frame and FIN, handle normally.
+						if(!current->opcode) { //must have opcode, cannot be continuation frame.
 							libwebsock_fail_connection(state);
 							break;
 						}
+						libwebsock_frame_act(state, current);
+					} else {
+						//new fragment series beginning
+						if(current->opcode & 0x8) { //can't fragment control frames.  FAIL
+							libwebsock_fail_connection(state);
+							break;
+						}
+						if(!current->opcode) { //new fragment series must have opcode.
+							libwebsock_fail_connection(state);
+							break;
+						}
+						new = (libwebsock_frame *)malloc(sizeof(libwebsock_frame));
+						memset(new, 0, sizeof(libwebsock_frame));
+						new->rawdata_sz = FRAME_CHUNK_LENGTH;
+						new->rawdata = (char *)malloc(new->rawdata_sz);
+						new->prev_frame = current;
+						current->next_frame = new;
+						state->current_frame = new;
+						state->flags |= STATE_RECEIVING_FRAGMENT;
 					}
-					new = (libwebsock_frame *)malloc(sizeof(libwebsock_frame));
-					memset(new, 0, sizeof(libwebsock_frame));
-					new->payload_len = -1;
-					new->rawdata_sz = FRAME_CHUNK_LENGTH;
-					new->rawdata = (char *)malloc(new->rawdata_sz);
-					new->prev_frame = current;
-					current->next_frame = new;
-					state->current_frame = new;
 				}
-				if(state->flags & STATE_SHOULD_CLOSE) {
-					break; //check to see if we should close after processing each frame.
+				if(state->flags & STATE_SHOULD_CLOSE) { //after each complete frame, check to see if we should stop processing now.
+					break;
 				}
+
 			} else if(complete_frame == -1) {
 				//FAIL connection
 				libwebsock_fail_connection(state);

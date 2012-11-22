@@ -167,6 +167,7 @@ int libwebsock_default_onclose_callback(libwebsock_client_state *state);
 int libwebsock_default_onopen_callback(libwebsock_client_state *state);
 int libwebsock_default_onmessage_callback(libwebsock_client_state *state, libwebsock_message *msg);
 int libwebsock_default_control_callback(libwebsock_client_state *state, libwebsock_frame *ctl_frame);
+inline void libwebsock_frame_act(libwebsock_client_state *state, libwebsock_frame *frame);
 void libwebsock_populate_close_info_from_frame(libwebsock_close_info **info, libwebsock_frame *close_frame);
 void libwebsock_fail_connection(libwebsock_client_state *state);
 void libwebsock_cleanup_context(libwebsock_context *ctx);

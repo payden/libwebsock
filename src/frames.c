@@ -134,7 +134,6 @@ int libwebsock_complete_frame(libwebsock_frame *frame) {
 			for(i = 0; i < MASK_LENGTH; i++) {
 				frame->mask[i] = *(frame->rawdata + frame->mask_offset + i) & 0xff;
 			}
-			//libwebsock_dump_frame(frame);
 			return 1;
 	}
 	return 0; //never reached
