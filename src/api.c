@@ -1,3 +1,22 @@
+/*
+ * This file is part of libwebsock
+ *
+ * Copyright (C) 2012 Payden Sutherland
+ *
+ * libwebsock is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; version 3 of the License.
+ *
+ * libwebsock is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with libwebsock; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,6 +28,7 @@
 
 
 void libwebsock_dump_frame(libwebsock_frame *frame) {
+	int i;
 	fprintf(stderr, "FIN: %d\n", frame->fin);
 	fprintf(stderr, "Opcode: %d\n", frame->opcode);
 	fprintf(stderr, "mask_offset: %d\n", frame->mask_offset);
@@ -19,7 +39,6 @@ void libwebsock_dump_frame(libwebsock_frame *frame) {
 	fprintf(stderr, "Has previous frame: %d\n", frame->prev_frame != NULL ? 1 : 0);
 	fprintf(stderr, "Has next frame: %d\n", frame->next_frame != NULL ? 1 : 0);
 	fprintf(stderr, "Raw data:\n");
-	int i;
 	fprintf(stderr, "%02x", *(frame->rawdata) & 0xff);
 	for(i=1;i<frame->rawdata_idx;i++) {
 		fprintf(stderr, ":%02x", *(frame->rawdata+i) & 0xff);
