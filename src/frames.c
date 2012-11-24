@@ -90,7 +90,7 @@ libwebsock_frame_act(libwebsock_client_state *state, libwebsock_frame *frame)
       state->current_frame = NULL;
       break;
     default:
-      libwebsock_fail_connection(state, WS_CLOSE_WRONG_TYPE);
+      libwebsock_fail_connection(state, WS_CLOSE_PROTOCOL_ERROR);
       break;
   }
 }

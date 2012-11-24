@@ -74,6 +74,13 @@ libwebsock_close_with_reason(libwebsock_client_state *state, unsigned short code
 }
 
 int
+libwebsock_send_text_with_length(libwebsock_client_state *state, char *strdata, unsigned long long payload_len)
+{
+  int flags = WS_FRAGMENT_FIN | WS_OPCODE_TEXT;
+  return libwebsock_send_fragment(state, strdata, payload_len, flags);
+}
+
+int
 libwebsock_send_text(libwebsock_client_state *state, char *strdata)
 {
   unsigned long long len = strlen(strdata);

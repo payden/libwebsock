@@ -174,6 +174,7 @@ int libwebsock_close_with_reason(libwebsock_client_state *state, unsigned short 
 int libwebsock_send_fragment(libwebsock_client_state *state, const char *data, unsigned long long len, int flags);
 int libwebsock_send_binary(libwebsock_client_state *state, char *in_data, unsigned long long payload_len);
 int libwebsock_send_text(libwebsock_client_state *state, char *strdata);
+int libwebsock_send_text_with_length(libwebsock_client_state *state, char *strdata, unsigned long long payload_len);
 int libwebsock_read_header(libwebsock_frame *frame);
 int libwebsock_default_onclose_callback(libwebsock_client_state *state);
 int libwebsock_default_onopen_callback(libwebsock_client_state *state);
