@@ -1,4 +1,7 @@
 language: c
 compiler:
   - gcc
+before_install:
+  - sudo apt-get update -qq
+  - sudo apt-get install -qq libevent-2.0-5 libevent-openssl-2.0-5 libevent-dev
 script: ./autogen.sh && ./configure && make
