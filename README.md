@@ -11,6 +11,8 @@ simple echo server is implemented.
 
 You can find the latest autobahn test results [here][3].
 
+Current Travis CI Build Status: [![Build Status][4]][5]
+
 ## Features
 
 * Callbacks for events
@@ -23,3 +25,5 @@ You can find the latest autobahn test results [here][3].
  [1]: https://github.com/payden/libwebsock/blob/master/examples/echo.c
  [2]: http://libevent.org
  [3]: http://paydensutherland.com/autobahn
+ [4]: https://travis-ci.org/payden/libwebsock.png
+ [5]: https://travis-ci.org/payden/libwebsock
