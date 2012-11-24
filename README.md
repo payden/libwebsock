@@ -11,7 +11,9 @@ simple echo server is implemented.
 
 You can find the latest autobahn test results [here][3].
 
-Current Travis CI Build Status: [![Build Status][4]][5]
+Current Travis CI Build Status:
+
+[![Build Status][4]][5]
 
 ## Features
 
