@@ -2,9 +2,9 @@ LIBWEBSOCK_LIBRARY_VERSION=1:0:0
 lib_LTLIBRARIES=libwebsock.la
 
 if HAVE_SSL
-libwebsock_la_SOURCES = websock.c base64.c sha1.c frames.c default_callbacks.c api.c openssl.c sha1.h base64.h
+libwebsock_la_SOURCES = websock.c base64.c sha1.c frames.c default_callbacks.c api.c openssl.c sha1.h base64.h utf.c util.c
 else
-libwebsock_la_SOURCES = websock.c base64.c sha1.c frames.c default_callbacks.c api.c sha1.h base64.h
+libwebsock_la_SOURCES = websock.c base64.c sha1.c frames.c default_callbacks.c api.c sha1.h base64.h utf.c util.c
 endif
 
 libwebsock_la_LDFLAGS = -version-info $(LIBWEBSOCK_LIBRARY_VERSION)

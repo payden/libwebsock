@@ -51,7 +51,7 @@ libwebsock_default_control_callback(libwebsock_client_state *state, libwebsock_f
   unsigned short code;
   unsigned short code_be;
   if (ctl_frame->payload_len > 125) {
-    libwebsock_fail_connection(state);
+    libwebsock_fail_connection(state, WS_CLOSE_PROTOCOL_ERROR);
     return 0;
   }
 
@@ -75,9 +75,12 @@ libwebsock_default_control_callback(libwebsock_client_state *state, libwebsock_f
 
           code_be = htobe16(WS_CLOSE_PROTOCOL_ERROR);
           memcpy(ctl_frame->rawdata + ctl_frame->payload_offset, &code_be, 2);
+        } else if (!validate_utf8_sequence(state->close_info->reason)) {
+          code_be = htobe16(WS_CLOSE_WRONG_TYPE);
+          memcpy(ctl_frame->rawdata + ctl_frame->payload_offset, &code_be, 2);
         }
       }
-      if ((state->flags & STATE_SENT_CLOSE_FRAME)== 0){
+      if ((state->flags & STATE_SENT_CLOSE_FRAME) == 0){
         //client request close.  Echo close frame as acknowledgement
         evbuffer_add(output, ctl_frame->rawdata, ctl_frame->payload_offset + ctl_frame->payload_len);
       }
@@ -91,7 +94,7 @@ libwebsock_default_control_callback(libwebsock_client_state *state, libwebsock_f
     case WS_OPCODE_PONG:
       break;
     default:
-      libwebsock_fail_connection(state);
+      libwebsock_fail_connection(state, WS_CLOSE_PROTOCOL_ERROR);
       break;
   }
   return 1;

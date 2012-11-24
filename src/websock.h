@@ -168,6 +168,7 @@ typedef struct _libwebsock_ssl_event_data {
 
 //function defs
 
+int validate_utf8_sequence(uint8_t *s);
 int libwebsock_close(libwebsock_client_state *state);
 int libwebsock_close_with_reason(libwebsock_client_state *state, unsigned short code, const char *reason);
 int libwebsock_send_fragment(libwebsock_client_state *state, const char *data, unsigned long long len, int flags);
@@ -180,7 +181,7 @@ int libwebsock_default_onmessage_callback(libwebsock_client_state *state, libweb
 int libwebsock_default_control_callback(libwebsock_client_state *state, libwebsock_frame *ctl_frame);
 inline void libwebsock_frame_act(libwebsock_client_state *state, libwebsock_frame *frame);
 void libwebsock_populate_close_info_from_frame(libwebsock_close_info **info, libwebsock_frame *close_frame);
-void libwebsock_fail_connection(libwebsock_client_state *state);
+void libwebsock_fail_connection(libwebsock_client_state *state, unsigned short close_code);
 void libwebsock_cleanup_context(libwebsock_context *ctx);
 void libwebsock_handle_signal(evutil_socket_t sig, short event, void *ptr);
 void libwebsock_handle_control_frame(libwebsock_client_state *state, libwebsock_frame *ctl_frame);
