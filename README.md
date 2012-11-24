@@ -18,6 +18,7 @@ You can find the latest autobahn test results [here][3].
 * Easy to use
 * Uses [libevent][2] for portability (tested on Linux/FreeBSD)
 * IPv6 support
+* No failures on Autobahn Test suite
 
  [1]: https://github.com/payden/libwebsock/blob/master/examples/echo.c
  [2]: http://libevent.org
