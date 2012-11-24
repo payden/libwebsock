@@ -68,16 +68,28 @@ void libwebsock_cleanup_frames(libwebsock_frame *first) {
 	}
 }
 
-int libwebsock_complete_frame(libwebsock_frame *frame) {
+inline void libwebsock_frame_act(libwebsock_client_state *state, libwebsock_frame *frame) {
+	switch(frame->opcode) {
+		case WS_OPCODE_CLOSE:
+		case WS_OPCODE_PING:
+		case WS_OPCODE_PONG:
+			libwebsock_handle_control_frame(state, frame);
+			break;
+		case WS_OPCODE_TEXT:
+		case WS_OPCODE_BINARY:
+		case WS_OPCODE_CONTINUE:
+			libwebsock_dispatch_message(state, frame);
+			state->current_frame = NULL;
+			break;
+		default:
+			libwebsock_fail_connection(state);
+			break;
+	}
+}
+
+int libwebsock_read_header(libwebsock_frame *frame) {
 	int i;
-	enum {
-		sw_start = 0,
-		sw_got_two,
-		sw_got_short_len,
-		sw_got_full_len,
-
-
-	} state;
+	enum WS_FRAME_STATE state;
 
 	state = frame->state;
 	switch(state) {
@@ -128,13 +140,15 @@ int libwebsock_complete_frame(libwebsock_frame *frame) {
 			}
 			break;
 		case sw_got_full_len:
-			if(frame->rawdata_idx < frame->payload_offset + frame->payload_len) {
+			if(frame->rawdata_idx < frame->mask_offset + MASK_LENGTH) {
 				break;
 			}
 			for(i = 0; i < MASK_LENGTH; i++) {
 				frame->mask[i] = *(frame->rawdata + frame->mask_offset + i) & 0xff;
 			}
+			frame->state = sw_loaded_mask;
 			return 1;
+			break;
 	}
-	return 0; //never reached
+	return 0;
 }

@@ -31,10 +31,13 @@
 #  define be64toh(x) betoh64(x)
 #endif
 
-
+#include <stdint.h>
 #include <event2/event.h>
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
+#include <iconv.h>
+#include <wchar.h>
+#include <errno.h>
 #ifdef WEBSOCK_HAVE_SSL
 #include <openssl/ssl.h>
 #include <event2/bufferevent_ssl.h>
@@ -77,6 +80,14 @@
 #define STATE_RECEIVING_FRAGMENT (1 << 6)
 
 
+enum WS_FRAME_STATE {
+	sw_start = 0,
+	sw_got_two,
+	sw_got_short_len,
+	sw_got_full_len,
+	sw_loaded_mask
+};
+
 typedef struct _libwebsock_string {
 	char *data;
 	int length;
@@ -97,7 +108,7 @@ typedef struct _libwebsock_frame {
 	struct _libwebsock_frame *next_frame;
 	struct _libwebsock_frame *prev_frame;
 	unsigned char mask[4];
-	int state;
+	enum WS_FRAME_STATE state;
 } libwebsock_frame;
 
 typedef struct _libwebsock_message {
@@ -162,7 +173,7 @@ int libwebsock_close_with_reason(libwebsock_client_state *state, unsigned short 
 int libwebsock_send_fragment(libwebsock_client_state *state, const char *data, unsigned long long len, int flags);
 int libwebsock_send_binary(libwebsock_client_state *state, char *in_data, unsigned long long payload_len);
 int libwebsock_send_text(libwebsock_client_state *state, char *strdata);
-int libwebsock_complete_frame(libwebsock_frame *frame);
+int libwebsock_read_header(libwebsock_frame *frame);
 int libwebsock_default_onclose_callback(libwebsock_client_state *state);
 int libwebsock_default_onopen_callback(libwebsock_client_state *state);
 int libwebsock_default_onmessage_callback(libwebsock_client_state *state, libwebsock_message *msg);
