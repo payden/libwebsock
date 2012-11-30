@@ -22,6 +22,7 @@
 #include <string.h>
 #include <netdb.h>
 #include <signal.h>
+#include <unistd.h>
 
 #include "websock.h"
 
@@ -166,8 +167,6 @@ libwebsock_context *
 libwebsock_init(void)
 {
   libwebsock_context *ctx;
-  struct addrinfo hints, *servinfo = NULL, *p = NULL;
-  int yes = 1;
   ctx = (libwebsock_context *) malloc(sizeof(libwebsock_context));
   if (!ctx) {
     fprintf(stderr, "Unable to allocate memory for libwebsock context.\n");

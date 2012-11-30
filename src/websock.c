@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "websock.h"
 #include "sha1.h"
@@ -114,11 +115,7 @@ libwebsock_send_fragment(libwebsock_client_state *state, const char *data, unsig
   unsigned short int payload_len_short_be;
   unsigned char finNopcode, payload_len_small;
   unsigned int payload_offset = 2;
-  unsigned int len_size;
-  unsigned long long be_payload_len;
-  unsigned int sent = 0;
   unsigned int frame_size;
-  int i;
   char *frame;
 
   finNopcode = flags & 0xff;
@@ -162,7 +159,7 @@ libwebsock_handle_accept(evutil_socket_t listener, short event, void *arg)
   libwebsock_context *ctx = arg;
   libwebsock_client_state *client_state;
   struct bufferevent *bev;
-  struct sockaddr_storage ss, *sa;
+  struct sockaddr_storage ss;
   socklen_t slen = sizeof(ss);
   int fd = accept(listener, (struct sockaddr *) &ss, &slen);
   if (fd < 0) {
@@ -218,8 +215,7 @@ libwebsock_handle_recv(struct bufferevent *bev, void *ptr)
   libwebsock_client_state *state = ptr;
   libwebsock_frame *current = NULL, *new = NULL;
   struct evbuffer *input;
-  unsigned char payload_len_short;
-  int i, complete_frame, datalen, err;
+  int i, datalen, err;
   char buf[1024];
 
   input = bufferevent_get_input(bev);
@@ -328,7 +324,7 @@ void
 libwebsock_dispatch_message(libwebsock_client_state *state, libwebsock_frame *current)
 {
   unsigned long long message_payload_len, message_offset;
-  int message_opcode, i, err;
+  int message_opcode, i;
   char *message_payload;
 
   libwebsock_frame *first = NULL;
@@ -359,7 +355,7 @@ libwebsock_dispatch_message(libwebsock_client_state *state, libwebsock_frame *cu
   libwebsock_cleanup_frames(first);
 
   if(message_opcode == WS_OPCODE_TEXT) {
-    if(!validate_utf8_sequence(message_payload)) {
+    if(!validate_utf8_sequence((uint8_t *)message_payload)) {
       fprintf(stderr, "Error validating UTF-8 sequence.\n");
       free(message_payload);
       libwebsock_fail_connection(state, WS_CLOSE_WRONG_TYPE);
@@ -397,7 +393,6 @@ libwebsock_handshake_finish(struct bufferevent *bev, libwebsock_client_state *st
   SHA1Context shactx;
   SHA1Reset(&shactx);
   int n = 0;
-  int x = 0;
 
   output = bufferevent_get_output(bev);
 

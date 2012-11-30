@@ -17,6 +17,8 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA
  */
 
+#include <unistd.h>
+
 #include "websock.h"
 
 void
@@ -27,7 +29,7 @@ libwebsock_handle_accept_ssl(evutil_socket_t listener, short event, void *arg)
   SSL_CTX *ssl_ctx = evdata->ssl_ctx;
   libwebsock_client_state *client_state;
   struct bufferevent *bev;
-  struct sockaddr_storage ss, *sa;
+  struct sockaddr_storage ss;
   socklen_t slen = sizeof(ss);
   int fd = accept(listener, (struct sockaddr *) &ss, &slen);
   if (fd < 0) {

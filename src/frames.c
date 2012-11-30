@@ -159,6 +159,8 @@ libwebsock_read_header(libwebsock_frame *frame)
       frame->state = sw_loaded_mask;
       return 1;
       break;
+    case sw_loaded_mask:
+      break;
   }
   return 0;
 }

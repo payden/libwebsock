@@ -75,7 +75,7 @@ libwebsock_default_control_callback(libwebsock_client_state *state, libwebsock_f
 
           code_be = htobe16(WS_CLOSE_PROTOCOL_ERROR);
           memcpy(ctl_frame->rawdata + ctl_frame->payload_offset, &code_be, 2);
-        } else if (!validate_utf8_sequence(state->close_info->reason)) {
+        } else if (!validate_utf8_sequence((uint8_t *)state->close_info->reason)) {
           code_be = htobe16(WS_CLOSE_WRONG_TYPE);
           memcpy(ctl_frame->rawdata + ctl_frame->payload_offset, &code_be, 2);
         }
