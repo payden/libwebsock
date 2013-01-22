@@ -20,9 +20,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <netdb.h>
 #include <signal.h>
 #include <unistd.h>
+
+#ifndef _WIN32
+#include <netdb.h>
+#endif
 
 #include "websock.h"
 
@@ -178,6 +181,11 @@ libwebsock_init(void)
   ctx->onopen = libwebsock_default_onopen_callback;
   ctx->control_callback = libwebsock_default_control_callback;
   ctx->onmessage = libwebsock_default_onmessage_callback;
+
+#ifdef _WIN32
+  WSADATA WSAData;
+  WSAStartup(0x101, &WSAData);
+#endif
 
   ctx->base = event_base_new();
   if (!ctx->base) {

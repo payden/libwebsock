@@ -22,5 +22,9 @@
 #include <stdint.h>
 
 int validate_utf8_sequence(uint8_t *s);
+uint16_t lws_htobe16(uint16_t x);
+uint16_t lws_be16toh(uint16_t x);
+uint64_t lws_htobe64(uint64_t x);
+uint64_t lws_be64toh(uint64_t x);
 
 #endif /* UTIL_H_ */

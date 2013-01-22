@@ -29,13 +29,21 @@
 #  define be16toh(x) betoh16(x)
 #  define be32toh(x) betoh32(x)
 #  define be64toh(x) betoh64(x)
+#elif defined(_WIN32)
+#  define be16toh(x) lws_be16toh(x)
+#  define be64toh(x) lws_be16toh(x)
+#  define htobe16(x) lws_htobe16(x)
+#  define htobe64(x) lws_htobe64(x)
+#endif
+
+#ifdef _WIN32
+#include <ws2tcpip.h>
 #endif
 
 #include <stdint.h>
 #include <event2/event.h>
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
-#include <iconv.h>
 #include <wchar.h>
 #include <errno.h>
 #ifdef WEBSOCK_HAVE_SSL
