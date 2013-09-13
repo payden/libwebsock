@@ -106,7 +106,7 @@ libwebsock_wait(libwebsock_context *ctx)
   sig_event = evsignal_new(ctx->base, SIGINT, libwebsock_handle_signal, (void *)ctx);
   event_add(sig_event, NULL );
   ctx->running = 1;
-  event_base_dispatch(ctx->base);
+  event_base_loop(ctx->base, ctx->flags);
   ctx->running = 0;
   event_free(sig_event);
 }
@@ -167,7 +167,12 @@ libwebsock_bind(libwebsock_context *ctx, char *listen_host, char *port)
 }
 
 libwebsock_context *
-libwebsock_init(void)
+libwebsock_init(void) {
+  return libwebsock_init_flags(0);
+}
+
+libwebsock_context *
+libwebsock_init_flags(int flags)
 {
   libwebsock_context *ctx;
   ctx = (libwebsock_context *) malloc(sizeof(libwebsock_context));
@@ -177,6 +182,7 @@ libwebsock_init(void)
   }
   memset(ctx, 0, sizeof(libwebsock_context));
 
+  ctx->flags = flags;
   ctx->onclose = libwebsock_default_onclose_callback;
   ctx->onopen = libwebsock_default_onopen_callback;
   ctx->control_callback = libwebsock_default_control_callback;
