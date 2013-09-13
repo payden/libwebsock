@@ -29,10 +29,21 @@
 #  define be16toh(x) betoh16(x)
 #  define be32toh(x) betoh32(x)
 #  define be64toh(x) betoh64(x)
-#elif defined(_WIN32)
+#endif
+
+#ifndef be16toh
 #  define be16toh(x) lws_be16toh(x)
+#endif
+
+#ifndef be64toh
 #  define be64toh(x) lws_be16toh(x)
+#endif
+
+#ifndef htobe16
 #  define htobe16(x) lws_htobe16(x)
+#endif
+
+#ifndef htobe64
 #  define htobe64(x) lws_htobe64(x)
 #endif
 
@@ -66,6 +77,8 @@
 #define MASK_LENGTH 4
 
 #define WS_FRAGMENT_FIN (1 << 7)
+
+#define WS_NONBLOCK 0x02
 
 #define WS_OPCODE_CONTINUE 0x0
 #define WS_OPCODE_TEXT 0x1
