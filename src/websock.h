@@ -36,7 +36,7 @@
 #endif
 
 #ifndef be64toh
-#  define be64toh(x) lws_be16toh(x)
+#  define be64toh(x) lws_be64toh(x)
 #endif
 
 #ifndef htobe16

@@ -111,8 +111,8 @@ int
 libwebsock_send_fragment(libwebsock_client_state *state, const char *data, unsigned long long len, int flags)
 {
   struct evbuffer *output = bufferevent_get_output(state->bev);
-  unsigned long long payload_len_long_be;
-  unsigned short int payload_len_short_be;
+  unsigned long long *payload_len_long_be;
+  unsigned short int *payload_len_short_be;
   unsigned char finNopcode, payload_len_small;
   unsigned int payload_offset = 2;
   unsigned int frame_size;
@@ -141,12 +141,12 @@ libwebsock_send_fragment(libwebsock_client_state *state, const char *data, unsig
   *(frame + 1) = payload_len_small;
   if (payload_len_small == 126) {
     len &= 0xffff;
-    payload_len_short_be = htobe16(len);
-    memcpy(frame + 2, &payload_len_short_be, 2);
+    payload_len_short_be = (unsigned short *) ((char *)frame + 2);
+    *payload_len_short_be = htobe16(len);
   }
   if (payload_len_small == 127) {
-    payload_len_long_be = htobe64(len);
-    memcpy(frame + 2, &payload_len_long_be, 8);
+    payload_len_long_be = (unsigned long long *) ((char *)frame + 2);
+    *payload_len_long_be = htobe64(len);
   }
   memcpy(frame + payload_offset, data, len);
 
@@ -313,8 +313,10 @@ libwebsock_fail_connection(libwebsock_client_state *state, unsigned short close_
 {
   struct evbuffer *output = bufferevent_get_output(state->bev);
   char close_frame[4] = { 0x88, 0x02, 0x00, 0x00 };
-  unsigned short code_be = htobe16(close_code);
-  memcpy(&close_frame[2], &code_be, 2);
+
+  unsigned short *code_be = (unsigned short *) &close_frame[2];
+
+  *code_be = htobe16(close_code);
 
   evbuffer_add(output, close_frame, 4);
   state->flags |= STATE_SHOULD_CLOSE;
