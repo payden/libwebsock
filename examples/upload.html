@@ -1,0 +1,60 @@
+<html>
+<head>
+<title>WebSocket Upload Test</title>
+</head>
+<body>
+<input type="file" id="theFile"/>
+<input type="button" id="theButton" value="Upload"/>
+<div id="percent"></div>
+<script src="jquery.min.js"></script>
+<script type="text/javascript">
+var reader = null;
+$(document).ready(function() {
+  console.log("Ready");
+  $("#theFile").change(function(e) {
+    var theFile = $(this)[0].files[0];
+    console.log(theFile);
+    reader = new FileReader();
+    reader.readAsArrayBuffer(theFile);
+    reader.onloadend = function() {
+      console.log(reader.result);
+    };
+  });
+  $("#theButton").click(function(e) {
+    if (reader == null) {
+      alert("Please select a file to upload");
+      return false;
+    }
+    var ws = new WebSocket("wss://ubiety.net");
+    ws.onclose = function(e) {
+      if (e.code == 1000 && e.reason == "Success") {
+        alert("Successfully uploaded file.");
+      }
+    }
+    ws.onmessage = function(e) {
+      $("#percent").html(e.data);
+    }
+    ws.onopen = function() {
+      var ab = new ArrayBuffer(8);
+      var dv = new DataView(ab);
+      dv.setUint8(0, 'e'.charCodeAt(0));
+      dv.setUint8(1, 'i'.charCodeAt(0));
+      dv.setUint8(2, 'r'.charCodeAt(0));
+      dv.setUint8(3, 'B'.charCodeAt(0));
+      dv.setUint32(4, reader.result.byteLength);
+      ws.send(ab);
+      for(var i=0;i<reader.result.byteLength;i++) {
+        var to_send = i + 1024 > reader.result.byteLength ? reader.result.byteLength - i : 1024;
+        if (to_send == 0) {
+          break;
+        }
+        ws.send(reader.result.slice(i, i + to_send));
+        i += to_send - 1;
+      }
+    }
+
+  }); 
+});
+</script>
+</body>
+</html>
