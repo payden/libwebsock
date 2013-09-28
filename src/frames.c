@@ -47,13 +47,11 @@ libwebsock_handle_control_frame(libwebsock_client_state *state, libwebsock_frame
 {
   libwebsock_frame *ptr = NULL;
   state->control_callback(state, ctl_frame);
-  //the idea here is to reset this frame to the state it was in before we received control frame.
   // Control frames can be injected in the midst of a fragmented message.
   // We need to maintain the link to previous frame if present.
   // It should be noted that ctl_frame is still state->current_frame after this function returns.
   // So even though the below refers to ctl_frame, I'm really setting up state->current_frame to continue receiving data on the next go 'round
-  ptr = ctl_frame->prev_frame; //This very well may be a NULL pointer, but just in case we preserve it.
-  ctl_frame->prev_frame = ptr;
+
   //should be able to reuse this frame by setting these two members to zero.  Avoid free/malloc of rawdata
   ctl_frame->state = 0;
   ctl_frame->rawdata_idx = 0;
@@ -90,6 +88,8 @@ libwebsock_frame_act(libwebsock_client_state *state, libwebsock_frame *frame)
       state->current_frame = NULL;
       break;
     default:
+      libwebsock_cleanup_frames(frame);
+      state->current_frame = NULL;
       libwebsock_fail_connection(state, WS_CLOSE_PROTOCOL_ERROR);
       break;
   }
@@ -110,17 +110,20 @@ libwebsock_read_header(libwebsock_frame *frame)
       frame->state = sw_got_two;
       break;
     case sw_got_two:
-      if ((*(frame->rawdata) & 0x70) != 0) { //some reserved bits were set
-        return -1;
-      }
-      if ((*(frame->rawdata + 1) & 0x80) != 0x80) {
-        return -1;
-      }
       frame->mask_offset = 2;
       frame->fin = (*(frame->rawdata) & 0x80) == 0x80 ? 1 : 0;
       frame->opcode = *(frame->rawdata) & 0xf;
       frame->payload_len_short = *(frame->rawdata + 1) & 0x7f;
       frame->state = sw_got_short_len;
+      if ((*(frame->rawdata) & 0x70) != 0) {  //some reserved bits set
+        return -1;
+      }
+      if ((*(frame->rawdata) & 0xf8) == 0x08) { //continuation control frame. invalid.
+        return -1;
+      }
+      if ((*(frame->rawdata + 1) & 0x80) != 0x80) {
+        return -1;
+      }
       break;
     case sw_got_short_len:
       switch (frame->payload_len_short) {

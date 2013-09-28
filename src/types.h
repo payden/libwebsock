@@ -77,6 +77,7 @@ typedef struct _libwebsock_client_state {
         SSL *ssl;
 #endif
         libwebsock_close_info *close_info;
+        void *ctx;
 } libwebsock_client_state;
 
 typedef struct _libwebsock_context {

@@ -50,8 +50,15 @@ libwebsock_default_control_callback(libwebsock_client_state *state, libwebsock_f
   int i;
   unsigned short code;
   unsigned short code_be;
+
+  if ((state->flags & STATE_SENT_CLOSE_FRAME) && (ctl_frame->opcode != WS_OPCODE_CLOSE)) {
+    return 0;
+  }
   if (ctl_frame->payload_len > 125) {
     libwebsock_fail_connection(state, WS_CLOSE_PROTOCOL_ERROR);
+    if (ctl_frame->opcode == WS_OPCODE_CLOSE) {
+      libwebsock_shutdown(state);
+    }
     return 0;
   }
 
@@ -82,10 +89,23 @@ libwebsock_default_control_callback(libwebsock_client_state *state, libwebsock_f
       }
       if ((state->flags & STATE_SENT_CLOSE_FRAME) == 0){
         //client request close.  Echo close frame as acknowledgement
+        state->flags |= STATE_SHOULD_CLOSE|STATE_SENT_CLOSE_FRAME|STATE_RECEIVED_CLOSE_FRAME;
         evbuffer_add(output, ctl_frame->rawdata, ctl_frame->payload_offset + ctl_frame->payload_len);
+        if (state->flags & STATE_IS_SSL) {
+          libwebsock_shutdown(state);
+        } else {
+          bufferevent_setcb(state->bev, NULL, libwebsock_shutdown_after_send, NULL, (void *) state);
+        }
+        return 0;
+      } else {
+        if ((state->flags & STATE_RECEIVED_CLOSE_FRAME) == 0) { //received first close frame and already sent.
+          state->flags |= STATE_RECEIVED_CLOSE_FRAME;
+          libwebsock_shutdown(state);
+        } else {
+          //received second close frame?
+          return 0;
+        }
       }
-      state->flags |= STATE_SHOULD_CLOSE;
-      bufferevent_setcb(state->bev, NULL, libwebsock_handle_send, libwebsock_do_event, (void *) state);
       break;
     case WS_OPCODE_PING:
       *(ctl_frame->rawdata) = 0x8a;

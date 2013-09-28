@@ -65,14 +65,47 @@ libwebsock_populate_close_info_from_frame(libwebsock_close_info **info, libwebso
 void
 libwebsock_shutdown(libwebsock_client_state *state)
 {
-  libwebsock_string *str;
+  libwebsock_context *ctx = (libwebsock_context *) state->ctx;
+  struct event *ev;
+  struct timeval tv = { 1, 0 };
   if ((state->flags & STATE_CONNECTED) && state->onclose) {
     state->onclose(state);
+  }
+  bufferevent_free(state->bev);
+  //schedule cleanup.
+  ev = event_new(ctx->base, -1, 0, libwebsock_post_shutdown_cleanup, (void *) state);
+  event_add(ev, &tv);
+}
+
+void
+libwebsock_shutdown_after_send(struct bufferevent *bev, void *arg)
+{
+  struct event *ev;
+  struct timeval tv = { 0, 0 };
+  libwebsock_client_state *state = (libwebsock_client_state *) arg;
+  libwebsock_context *ctx = state->ctx;
+  ev = event_new(ctx->base, -1, 0, libwebsock_shutdown_after_send_cb, (void *) state);
+  event_add(ev, &tv);
+}
+
+void
+libwebsock_shutdown_after_send_cb(evutil_socket_t fd, short what, void *arg)
+{
+  libwebsock_client_state *state = (libwebsock_client_state *) arg;
+  libwebsock_shutdown(state);
+}
+
+void
+libwebsock_post_shutdown_cleanup(evutil_socket_t fd, short what, void *arg)
+{
+  libwebsock_client_state *state = (libwebsock_client_state *) arg;
+  libwebsock_string *str;
+  if (!state) {
+    return;
   }
   if (state->close_info) {
     free(state->close_info);
   }
-  libwebsock_free_all_frames(state);
   if (state->sa) {
     free(state->sa);
   }
@@ -85,20 +118,12 @@ libwebsock_shutdown(libwebsock_client_state *state)
       free(str);
     }
   }
-
-  bufferevent_free(state->bev);
   free(state);
 }
 
 void
 libwebsock_handle_send(struct bufferevent *bev, void *arg)
 {
-  libwebsock_client_state *state = arg;
-
-  if (state->flags & STATE_SHOULD_CLOSE) {
-    libwebsock_shutdown(state);
-  }
-
 }
 
 void
@@ -185,12 +210,12 @@ libwebsock_handle_accept(evutil_socket_t listener, short event, void *arg)
       close(fd);
       return;
     }
+    client_state->ctx = (void *) ctx;
     memcpy(client_state->sa, &ss, sizeof(struct sockaddr_storage));
     evutil_make_socket_nonblocking(fd);
     bev = bufferevent_socket_new(ctx->base, fd, BEV_OPT_CLOSE_ON_FREE);
     client_state->bev = bev;
     bufferevent_setcb(bev, libwebsock_handshake, libwebsock_handle_send, libwebsock_do_event, (void *) client_state);
-    bufferevent_setwatermark(bev, EV_READ, 0, 16384);
     bufferevent_enable(bev, EV_READ | EV_WRITE);
   }
 }
@@ -238,7 +263,10 @@ libwebsock_handle_recv(struct bufferevent *bev, void *ptr)
       if (current->state != sw_loaded_mask) {
         err = libwebsock_read_header(current);
         if (err == -1) {
-          libwebsock_fail_connection(state, WS_CLOSE_PROTOCOL_ERROR);
+          if ((state->flags & STATE_SENT_CLOSE_FRAME) == 0) {
+            libwebsock_fail_connection(state, WS_CLOSE_PROTOCOL_ERROR);
+            continue;
+          }
         }
         if (err == 0) {
           continue;
@@ -249,12 +277,22 @@ libwebsock_handle_recv(struct bufferevent *bev, void *ptr)
         continue;
       }
 
+      if (state->flags & STATE_FAILING_CONNECTION) {
+        if (current->opcode != WS_OPCODE_CLOSE) {
+          libwebsock_cleanup_frames(current);
+          state->current_frame = NULL;
+          continue;
+        }
+      }
+
       if (state->flags & STATE_RECEIVING_FRAGMENT) {
         if (current->fin == 1) {
           if ((current->opcode & 0x8) == 0) {
             if (current->opcode) { //non-ctrl and has opcode in the middle of fragment.  FAIL
               libwebsock_fail_connection(state, WS_CLOSE_PROTOCOL_ERROR);
-              break;
+              libwebsock_cleanup_frames(current);
+              state->current_frame = NULL;
+              continue;
             }
             state->flags &= ~STATE_RECEIVING_FRAGMENT;
           }
@@ -263,7 +301,9 @@ libwebsock_handle_recv(struct bufferevent *bev, void *ptr)
           //middle of fragment non-fin frame
           if (current->opcode) { //cannot have opcode
             libwebsock_fail_connection(state, WS_CLOSE_PROTOCOL_ERROR);
-            break;
+            libwebsock_cleanup_frames(current);
+            state->current_frame = NULL;
+            continue;
           }
           new = (libwebsock_frame *) malloc(sizeof(libwebsock_frame));
           memset(new, 0, sizeof(libwebsock_frame));
@@ -278,18 +318,25 @@ libwebsock_handle_recv(struct bufferevent *bev, void *ptr)
           //first frame and FIN, handle normally.
           if (!current->opcode) { //must have opcode, cannot be continuation frame.
             libwebsock_fail_connection(state, WS_CLOSE_PROTOCOL_ERROR);
-            break;
+            libwebsock_cleanup_frames(current);
+            state->current_frame = NULL;
+            continue;
           }
           libwebsock_frame_act(state, current);
+          continue;
         } else {
           //new fragment series beginning
           if (current->opcode & 0x8) { //can't fragment control frames.  FAIL
             libwebsock_fail_connection(state, WS_CLOSE_PROTOCOL_ERROR);
-            break;
+            libwebsock_cleanup_frames(current);
+            state->current_frame = NULL;
+            continue;
           }
           if (!current->opcode) { //new fragment series must have opcode.
             libwebsock_fail_connection(state, WS_CLOSE_PROTOCOL_ERROR);
-            break;
+            libwebsock_cleanup_frames(current);
+            state->current_frame = NULL;
+            continue;
           }
           new = (libwebsock_frame *) malloc(sizeof(libwebsock_frame));
           memset(new, 0, sizeof(libwebsock_frame));
@@ -300,9 +347,6 @@ libwebsock_handle_recv(struct bufferevent *bev, void *ptr)
           state->current_frame = new;
           state->flags |= STATE_RECEIVING_FRAGMENT;
         }
-      }
-      if (state->flags & STATE_SHOULD_CLOSE) { //after each complete frame, check to see if we should stop processing now.
-        break;
       }
     }
   }
@@ -316,10 +360,13 @@ libwebsock_fail_connection(libwebsock_client_state *state, unsigned short close_
 
   unsigned short *code_be = (unsigned short *) &close_frame[2];
 
+  if ((state->flags & STATE_FAILING_CONNECTION) != 0) {
+    return;
+  }
   *code_be = htobe16(close_code);
 
   evbuffer_add(output, close_frame, 4);
-  state->flags |= STATE_SHOULD_CLOSE;
+  state->flags |= STATE_SHOULD_CLOSE|STATE_SENT_CLOSE_FRAME|STATE_FAILING_CONNECTION;
 }
 
 void
@@ -329,6 +376,9 @@ libwebsock_dispatch_message(libwebsock_client_state *state, libwebsock_frame *cu
   int message_opcode, i;
   char *message_payload;
 
+  if (state->flags & STATE_SENT_CLOSE_FRAME) {
+     return;
+  }
   libwebsock_frame *first = NULL;
   libwebsock_message *msg = NULL;
   if (current == NULL) {
@@ -354,7 +404,6 @@ libwebsock_dispatch_message(libwebsock_client_state *state, libwebsock_frame *cu
 
   *(message_payload + message_offset) = '\0';
 
-  libwebsock_cleanup_frames(first);
 
   if(message_opcode == WS_OPCODE_TEXT) {
     if(!validate_utf8_sequence((uint8_t *)message_payload)) {
@@ -364,6 +413,8 @@ libwebsock_dispatch_message(libwebsock_client_state *state, libwebsock_frame *cu
       return;
     }
   }
+
+  libwebsock_cleanup_frames(first);
 
   msg = (libwebsock_message *) malloc(sizeof(libwebsock_message));
   memset(msg, 0, sizeof(libwebsock_message));

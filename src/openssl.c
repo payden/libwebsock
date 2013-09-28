@@ -61,11 +61,11 @@ libwebsock_handle_accept_ssl(evutil_socket_t listener, short event, void *arg)
     if (SSL_accept(client_state->ssl) <= 0) {
       fprintf(stderr, "error during ssl handshake.\n");
     }
+    client_state->ctx = (void *) ctx;
     evutil_make_socket_nonblocking(fd);
     bev = bufferevent_openssl_socket_new(ctx->base, -1, client_state->ssl, BUFFEREVENT_SSL_OPEN, BEV_OPT_CLOSE_ON_FREE);
     client_state->bev = bev;
     bufferevent_setcb(bev, libwebsock_handshake, NULL, libwebsock_do_event, (void *) client_state);
-    bufferevent_setwatermark(bev, EV_READ, 0, 16384);
     bufferevent_enable(bev, EV_READ | EV_WRITE);
   }
 }
