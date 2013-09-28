@@ -103,6 +103,7 @@ libwebsock_post_shutdown_cleanup(evutil_socket_t fd, short what, void *arg)
   if (!state) {
     return;
   }
+  libwebsock_free_all_frames(state);
   if (state->close_info) {
     free(state->close_info);
   }
