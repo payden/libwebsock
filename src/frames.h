@@ -21,11 +21,9 @@
 #define FRAMES_H_
 #include "types.h"
 
-inline void libwebsock_frame_act(libwebsock_client_state *state, libwebsock_frame *frame);
 void libwebsock_free_all_frames(libwebsock_client_state *state);
 void libwebsock_cleanup_frames(libwebsock_frame *first);
 void libwebsock_dump_frame(libwebsock_frame *frame);
-int libwebsock_read_header(libwebsock_frame *frame);
 
 
 #endif /* FRAMES_H_ */

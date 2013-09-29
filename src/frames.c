@@ -45,7 +45,6 @@ libwebsock_free_all_frames(libwebsock_client_state *state)
 void
 libwebsock_handle_control_frame(libwebsock_client_state *state, libwebsock_frame *ctl_frame)
 {
-  libwebsock_frame *ptr = NULL;
   state->control_callback(state, ctl_frame);
   // Control frames can be injected in the midst of a fragmented message.
   // We need to maintain the link to previous frame if present.
@@ -70,100 +69,4 @@ libwebsock_cleanup_frames(libwebsock_frame *first)
     }
     free(this);
   }
-}
-
-inline void
-libwebsock_frame_act(libwebsock_client_state *state, libwebsock_frame *frame)
-{
-  switch (frame->opcode) {
-    case WS_OPCODE_CLOSE:
-    case WS_OPCODE_PING:
-    case WS_OPCODE_PONG:
-      libwebsock_handle_control_frame(state, frame);
-      break;
-    case WS_OPCODE_TEXT:
-    case WS_OPCODE_BINARY:
-    case WS_OPCODE_CONTINUE:
-      libwebsock_dispatch_message(state, frame);
-      state->current_frame = NULL;
-      break;
-    default:
-      libwebsock_cleanup_frames(frame);
-      state->current_frame = NULL;
-      libwebsock_fail_connection(state, WS_CLOSE_PROTOCOL_ERROR);
-      break;
-  }
-}
-
-int
-libwebsock_read_header(libwebsock_frame *frame)
-{
-  int i;
-  enum WS_FRAME_STATE state;
-
-  state = frame->state;
-  switch (state) {
-    case sw_start:
-      if (frame->rawdata_idx < 2) {
-        break;
-      }
-      frame->state = sw_got_two;
-      break;
-    case sw_got_two:
-      frame->mask_offset = 2;
-      frame->fin = (*(frame->rawdata) & 0x80) == 0x80 ? 1 : 0;
-      frame->opcode = *(frame->rawdata) & 0xf;
-      frame->payload_len_short = *(frame->rawdata + 1) & 0x7f;
-      frame->state = sw_got_short_len;
-      if ((*(frame->rawdata) & 0x70) != 0) {  //some reserved bits set
-        return -1;
-      }
-      if ((*(frame->rawdata) & 0xf8) == 0x08) { //continuation control frame. invalid.
-        return -1;
-      }
-      if ((*(frame->rawdata + 1) & 0x80) != 0x80) {
-        return -1;
-      }
-      break;
-    case sw_got_short_len:
-      switch (frame->payload_len_short) {
-        case 126:
-          if (frame->rawdata_idx < 4) {
-            break;
-          }
-          frame->mask_offset += 2;
-          frame->payload_offset = frame->mask_offset + MASK_LENGTH;
-          frame->payload_len = be16toh(*((unsigned short int *)(frame->rawdata+2)));
-          frame->state = sw_got_full_len;
-          break;
-        case 127:
-          if (frame->rawdata_idx < 10) {
-            break;
-          }
-          frame->mask_offset += 8;
-          frame->payload_offset = frame->mask_offset + MASK_LENGTH;
-          frame->payload_len = be64toh(*((unsigned long long *)(frame->rawdata+2)));
-          frame->state = sw_got_full_len;
-          break;
-        default:
-          frame->payload_len = frame->payload_len_short;
-          frame->payload_offset = frame->mask_offset + MASK_LENGTH;
-          frame->state = sw_got_full_len;
-          break;
-      }
-      break;
-    case sw_got_full_len:
-      if (frame->rawdata_idx < frame->mask_offset + MASK_LENGTH) {
-        break;
-      }
-      for (i = 0; i < MASK_LENGTH; i++) {
-        frame->mask[i] = *(frame->rawdata + frame->mask_offset + i) & 0xff;
-      }
-      frame->state = sw_loaded_mask;
-      return 1;
-      break;
-    case sw_loaded_mask:
-      break;
-  }
-  return 0;
 }
