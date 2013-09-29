@@ -477,7 +477,6 @@ libwebsock_dispatch_message(libwebsock_client_state *state, libwebsock_frame *cu
      return;
   }
   libwebsock_frame *first = NULL;
-  libwebsock_message *msg = NULL;
   if (current == NULL) {
     fprintf(stderr, "Somehow, null pointer passed to libwebsock_dispatch_message.\n");
     exit(1);
@@ -513,18 +512,13 @@ libwebsock_dispatch_message(libwebsock_client_state *state, libwebsock_frame *cu
 
   libwebsock_cleanup_frames(first);
 
-  msg = (libwebsock_message *) malloc(sizeof(libwebsock_message));
-  memset(msg, 0, sizeof(libwebsock_message));
-  msg->opcode = message_opcode;
-  msg->payload_len = message_payload_len;
-  msg->payload = message_payload;
+  libwebsock_message msg = { .opcode = message_opcode, .payload_len = message_payload_len, .payload = message_payload };
   if (state->onmessage != NULL) {
-    state->onmessage(state, msg);
+    state->onmessage(state, &msg);
   } else {
     fprintf(stderr, "No onmessage call back registered with libwebsock.\n");
   }
-  free(msg->payload);
-  free(msg);
+  free(message_payload);
 }
 
 void
