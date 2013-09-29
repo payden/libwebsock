@@ -337,7 +337,7 @@ libwebsock_handle_recv(struct bufferevent *bev, void *ptr)
   libwebsock_client_state *state = ptr;
   libwebsock_frame *current = NULL, *new = NULL;
   struct evbuffer *input;
-  int i, datalen, err;
+  int i, datalen, err, current_frame_size;
   char buf[1024];
 
   input = bufferevent_get_input(bev);
@@ -353,7 +353,18 @@ libwebsock_handle_recv(struct bufferevent *bev, void *ptr)
       }
       current = state->current_frame;
       if (current->rawdata_idx >= current->rawdata_sz) {
+        //we certainly have frame size, no need to realloc a bunch of times in 1k chunks
+        //just grab the size, round up to nearest power of 2 and realloc once.
         current->rawdata_sz += current->rawdata_sz;
+        current_frame_size = current->payload_offset + current->payload_len;
+        current_frame_size--;
+        current_frame_size |= current_frame_size >> 1;
+        current_frame_size |= current_frame_size >> 2;
+        current_frame_size |= current_frame_size >> 4;
+        current_frame_size |= current_frame_size >> 8;
+        current_frame_size |= current_frame_size >> 16;
+        current_frame_size++;
+        current->rawdata_sz = current_frame_size;
         current->rawdata = (char *) realloc(current->rawdata, current->rawdata_sz);
       }
       *(current->rawdata + current->rawdata_idx++) = buf[i];
