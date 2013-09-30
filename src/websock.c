@@ -257,7 +257,6 @@ libwebsock_send_fragment(libwebsock_client_state *state, const char *data, unsig
     return -1;
   }
   frame = (char *) malloc(frame_size);
-  memset(frame, 0, frame_size);
   payload_len_small &= 0x7f;
   *frame = finNopcode;
   *(frame + 1) = payload_len_small;
@@ -502,20 +501,25 @@ libwebsock_dispatch_message(libwebsock_client_state *state, libwebsock_frame *cu
   message_opcode = current->opcode;
   message_payload = (char *) malloc(message_payload_len + 1);
 
+  //temp
+  int current_payload_len;
+  char *message_payload_orig = message_payload;
+  char *rawdata_ptr;
+  //end temp
   for (; current != NULL; current = current->next_frame) {
-    for (i = 0; i < current->payload_len; i++) {
-      *(message_payload + message_offset++) =
-          *(current->rawdata + current->payload_offset + i) ^ (current->mask[i % 4] & 0xff);
+    current_payload_len = current->payload_len;
+    rawdata_ptr = current->rawdata + current->payload_offset;
+    for (i = 0; i < current_payload_len; i++) {
+      *message_payload++ = *rawdata_ptr++ ^ (current->mask[i % 4] & 0xff);
     }
   }
 
-  *(message_payload + message_offset) = '\0';
-
+  *(message_payload) = '\0';
 
   if(message_opcode == WS_OPCODE_TEXT) {
-    if(!validate_utf8_sequence((uint8_t *)message_payload)) {
+    if(!validate_utf8_sequence((uint8_t *)message_payload_orig)) {
       fprintf(stderr, "Error validating UTF-8 sequence.\n");
-      free(message_payload);
+      free(message_payload_orig);
       libwebsock_fail_connection(state, WS_CLOSE_WRONG_TYPE);
       return;
     }
@@ -523,13 +527,13 @@ libwebsock_dispatch_message(libwebsock_client_state *state, libwebsock_frame *cu
 
   libwebsock_cleanup_frames(first);
 
-  libwebsock_message msg = { .opcode = message_opcode, .payload_len = message_payload_len, .payload = message_payload };
+  libwebsock_message msg = { .opcode = message_opcode, .payload_len = message_payload_len, .payload = message_payload_orig };
   if (state->onmessage != NULL) {
     state->onmessage(state, &msg);
   } else {
     fprintf(stderr, "No onmessage call back registered with libwebsock.\n");
   }
-  free(message_payload);
+  free(message_payload_orig);
 }
 
 void
