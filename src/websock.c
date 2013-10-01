@@ -60,10 +60,9 @@ libwebsock_read_header(libwebsock_frame *frame)
   switch (state) {
     case sw_start:
       if (frame->rawdata_idx < 2) {
-        break;
+        return 0;
       }
       frame->state = sw_got_two;
-      break;
     case sw_got_two:
       frame->mask_offset = 2;
       frame->fin = (*(frame->rawdata) & 0x80) == 0x80 ? 1 : 0;
@@ -79,12 +78,11 @@ libwebsock_read_header(libwebsock_frame *frame)
       if ((*(frame->rawdata + 1) & 0x80) != 0x80) {
         return -1;
       }
-      break;
     case sw_got_short_len:
       switch (frame->payload_len_short) {
         case 126:
           if (frame->rawdata_idx < 4) {
-            break;
+            return 0;
           }
           frame->mask_offset += 2;
           frame->payload_offset = frame->mask_offset + MASK_LENGTH;
@@ -93,7 +91,7 @@ libwebsock_read_header(libwebsock_frame *frame)
           break;
         case 127:
           if (frame->rawdata_idx < 10) {
-            break;
+            return 0;
           }
           frame->mask_offset += 8;
           frame->payload_offset = frame->mask_offset + MASK_LENGTH;
@@ -106,19 +104,18 @@ libwebsock_read_header(libwebsock_frame *frame)
           frame->state = sw_got_full_len;
           break;
       }
-      break;
     case sw_got_full_len:
       if (frame->rawdata_idx < frame->mask_offset + MASK_LENGTH) {
-        break;
+        return 0;
       }
       for (i = 0; i < MASK_LENGTH; i++) {
         frame->mask[i] = *(frame->rawdata + frame->mask_offset + i) & 0xff;
       }
       frame->state = sw_loaded_mask;
+      frame->size = frame->payload_offset + frame->payload_len;
       return 1;
-      break;
     case sw_loaded_mask:
-      break;
+      return 1;
   }
   return 0;
 }
@@ -340,17 +337,17 @@ libwebsock_handle_recv(struct bufferevent *bev, void *ptr)
   char buf[1024];
 
   input = bufferevent_get_input(bev);
-  while (evbuffer_get_length(input)) {
-    datalen = evbuffer_remove(input, buf, sizeof(buf));
+  while ((datalen = evbuffer_remove(input, buf, sizeof(buf))) && datalen != -1) {
     for (i = 0; i < datalen; i++) {
-      if (state->current_frame == NULL) {
-        state->current_frame = (libwebsock_frame *) malloc(sizeof(libwebsock_frame));
-        memset(state->current_frame, 0, sizeof(libwebsock_frame));
-        state->current_frame->payload_len = -1;
-        state->current_frame->rawdata_sz = FRAME_CHUNK_LENGTH;
-        state->current_frame->rawdata = (char *) malloc(state->current_frame->rawdata_sz);
-      }
       current = state->current_frame;
+      if (current == NULL) {
+        current = (libwebsock_frame *) malloc(sizeof(libwebsock_frame));
+        memset(current, 0, sizeof(libwebsock_frame));
+        current->payload_len = -1;
+        current->rawdata_sz = FRAME_CHUNK_LENGTH;
+        current->rawdata = (char *) malloc(FRAME_CHUNK_LENGTH);
+        state->current_frame = current;
+      }
       if (current->rawdata_idx >= current->rawdata_sz) {
         //we certainly have frame size, no need to realloc a bunch of times in 1k chunks
         //just grab the size, round up to nearest power of 2 and realloc once.
@@ -380,7 +377,7 @@ libwebsock_handle_recv(struct bufferevent *bev, void *ptr)
         }
       }
 
-      if (current->rawdata_idx < current->payload_offset + current->payload_len) {
+      if (current->rawdata_idx < current->size) {
         continue;
       }
 
@@ -510,7 +507,7 @@ libwebsock_dispatch_message(libwebsock_client_state *state, libwebsock_frame *cu
     current_payload_len = current->payload_len;
     rawdata_ptr = current->rawdata + current->payload_offset;
     for (i = 0; i < current_payload_len; i++) {
-      *message_payload++ = *rawdata_ptr++ ^ (current->mask[i % 4] & 0xff);
+      *message_payload++ = *rawdata_ptr++ ^ current->mask[i & 3];
     }
   }
 

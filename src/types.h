@@ -35,6 +35,7 @@ typedef struct _libwebsock_frame {
         unsigned int payload_offset;
         unsigned int rawdata_idx;
         unsigned int rawdata_sz;
+        unsigned int size;
         unsigned int payload_len_short;
         unsigned long long payload_len;
         char *rawdata;
