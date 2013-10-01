@@ -345,11 +345,23 @@ libwebsock_handle_recv(struct bufferevent *bev, void *ptr)
   libwebsock_client_state *state = ptr;
   libwebsock_frame *current = NULL, *new = NULL;
   struct evbuffer *input;
-  int i, datalen, err; 
-  char buf[1024];
+  struct evbuffer_iovec *iovec;
+  int i, datalen, err, n_vec, x, consumed; 
+  char *buf;
 
   input = bufferevent_get_input(bev);
-  while ((datalen = evbuffer_remove(input, buf, sizeof(buf))) && datalen != -1) {
+  n_vec = evbuffer_peek(input, -1, NULL, NULL, 0);
+  if (!n_vec) {
+    fprintf(stderr, "Weird evbuffer_peek returned 0 vectors available\n");
+    return;
+  }
+  iovec = (struct evbuffer_iovec *) malloc(sizeof(struct evbuffer_iovec) * n_vec);
+  evbuffer_peek(input, -1, NULL, iovec, n_vec);
+  consumed = 0;
+  for (x = 0; x < n_vec; x++) {
+    buf = iovec[x].iov_base;
+    datalen = iovec[x].iov_len;
+    consumed += datalen;
     for (i = 0; i < datalen; i++) {
       current = state->current_frame;
       if (current == NULL) {
@@ -452,6 +464,8 @@ libwebsock_handle_recv(struct bufferevent *bev, void *ptr)
       }
     }
   }
+  evbuffer_drain(input, consumed);
+  free(iovec);
 }
 
 void
