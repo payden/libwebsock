@@ -53,7 +53,7 @@ libwebsock_frame_act(libwebsock_client_state *state, libwebsock_frame *frame)
 static inline int
 libwebsock_read_header(libwebsock_frame *frame)
 {
-  int i;
+  int i, new_size;
   enum WS_FRAME_STATE state;
 
   state = frame->state;
@@ -113,6 +113,18 @@ libwebsock_read_header(libwebsock_frame *frame)
       }
       frame->state = sw_loaded_mask;
       frame->size = frame->payload_offset + frame->payload_len;
+      if (frame->size > frame->rawdata_sz) {
+        new_size = frame->size;
+        new_size--;
+        new_size |= new_size >> 1;
+        new_size |= new_size >> 2;
+        new_size |= new_size >> 4;
+        new_size |= new_size >> 8;
+        new_size |= new_size >> 16;
+        new_size++;
+        frame->rawdata_sz = new_size;
+        frame->rawdata = (char *) realloc(frame->rawdata, new_size);
+      }
       return 1;
     case sw_loaded_mask:
       return 1;
@@ -333,7 +345,7 @@ libwebsock_handle_recv(struct bufferevent *bev, void *ptr)
   libwebsock_client_state *state = ptr;
   libwebsock_frame *current = NULL, *new = NULL;
   struct evbuffer *input;
-  int i, datalen, err, current_frame_size;
+  int i, datalen, err; 
   char buf[1024];
 
   input = bufferevent_get_input(bev);
@@ -348,21 +360,7 @@ libwebsock_handle_recv(struct bufferevent *bev, void *ptr)
         current->rawdata = (char *) malloc(FRAME_CHUNK_LENGTH);
         state->current_frame = current;
       }
-      if (current->rawdata_idx >= current->rawdata_sz) {
-        //we certainly have frame size, no need to realloc a bunch of times in 1k chunks
-        //just grab the size, round up to nearest power of 2 and realloc once.
-        current->rawdata_sz += current->rawdata_sz;
-        current_frame_size = current->payload_offset + current->payload_len;
-        current_frame_size--;
-        current_frame_size |= current_frame_size >> 1;
-        current_frame_size |= current_frame_size >> 2;
-        current_frame_size |= current_frame_size >> 4;
-        current_frame_size |= current_frame_size >> 8;
-        current_frame_size |= current_frame_size >> 16;
-        current_frame_size++;
-        current->rawdata_sz = current_frame_size;
-        current->rawdata = (char *) realloc(current->rawdata, current->rawdata_sz);
-      }
+
       *(current->rawdata + current->rawdata_idx++) = buf[i];
       if (current->state != sw_loaded_mask) {
         err = libwebsock_read_header(current);
