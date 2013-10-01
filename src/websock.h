@@ -27,7 +27,6 @@
 #elif defined(__OpenBSD__)
 #  include <sys/types.h>
 #  define be16toh(x) betoh16(x)
-#  define be32toh(x) betoh32(x)
 #  define be64toh(x) betoh64(x)
 #endif
 
@@ -112,7 +111,7 @@
 
 //function defs
 
-int libwebsock_send_fragment(libwebsock_client_state *state, const char *data, unsigned long long len, int flags);
+int libwebsock_send_fragment(libwebsock_client_state *state, const char *data, unsigned int len, int flags);
 void libwebsock_send_cleanup(const void *data, size_t len, void *arg);
 void libwebsock_shutdown(libwebsock_client_state *state);
 void libwebsock_shutdown_after_send_cb(evutil_socket_t fd, short what, void *arg);

@@ -86,7 +86,7 @@ libwebsock_read_header(libwebsock_frame *frame)
           }
           frame->mask_offset += 2;
           frame->payload_offset = frame->mask_offset + MASK_LENGTH;
-          frame->payload_len = be16toh(*((unsigned short int *)(frame->rawdata+2)));
+          frame->payload_len = ntohs(*((unsigned short int *)(frame->rawdata+2)));
           frame->state = sw_got_full_len;
           break;
         case 127:
@@ -95,7 +95,7 @@ libwebsock_read_header(libwebsock_frame *frame)
           }
           frame->mask_offset += 8;
           frame->payload_offset = frame->mask_offset + MASK_LENGTH;
-          frame->payload_len = be64toh(*((unsigned long long *)(frame->rawdata+2)));
+          frame->payload_len = ntohl(*((unsigned int *)(frame->rawdata+6)));
           frame->state = sw_got_full_len;
           break;
         default:
@@ -105,7 +105,7 @@ libwebsock_read_header(libwebsock_frame *frame)
           break;
       }
     case sw_got_full_len:
-      if (frame->rawdata_idx < frame->mask_offset + MASK_LENGTH) {
+      if (frame->rawdata_idx < frame->payload_offset) {
         return 0;
       }
       for (i = 0; i < MASK_LENGTH; i++) {
@@ -160,7 +160,7 @@ libwebsock_populate_close_info_from_frame(libwebsock_close_info **info, libwebso
   memcpy(&code_be, close_frame->rawdata + close_frame->payload_offset, 2);
   at_most = close_frame->payload_len - 2;
   at_most = at_most > 124 ? 124 : at_most;
-  new_info->code = be16toh(code_be);
+  new_info->code = ntohs(code_be);
   if (close_frame->payload_len - 2 > 0) {
     memcpy(new_info->reason, close_frame->rawdata + close_frame->payload_offset + 2, at_most);
   }
@@ -239,10 +239,10 @@ libwebsock_send_cleanup(const void *data, size_t len, void *arg)
 }
 
 int
-libwebsock_send_fragment(libwebsock_client_state *state, const char *data, unsigned long long len, int flags)
+libwebsock_send_fragment(libwebsock_client_state *state, const char *data, unsigned int len, int flags)
 {
   struct evbuffer *output = bufferevent_get_output(state->bev);
-  unsigned long long *payload_len_long_be;
+  unsigned int *payload_len_32_be;
   unsigned short int *payload_len_short_be;
   unsigned char finNopcode, payload_len_small;
   unsigned int payload_offset = 2;
@@ -257,12 +257,12 @@ libwebsock_send_fragment(libwebsock_client_state *state, const char *data, unsig
     frame_size = 4 + len;
     payload_len_small = 126;
     payload_offset += 2;
-  } else if (len > 0xffff && len <= 0xffffffffffffffffLL) {
+  } else if (len > 0xffff && len <= 0xfffffff0) {
     frame_size = 10 + len;
     payload_len_small = 127;
     payload_offset += 8;
   } else {
-    fprintf(stderr, "Whoa man.  What are you trying to send?\n");
+    fprintf(stderr, "libwebsock does not support frame payload sizes over %u bytes long\n", 0xfffffff0);
     return -1;
   }
   frame = (char *) malloc(frame_size);
@@ -272,11 +272,12 @@ libwebsock_send_fragment(libwebsock_client_state *state, const char *data, unsig
   if (payload_len_small == 126) {
     len &= 0xffff;
     payload_len_short_be = (unsigned short *) ((char *)frame + 2);
-    *payload_len_short_be = htobe16(len);
+    *payload_len_short_be = htons(len);
   }
   if (payload_len_small == 127) {
-    payload_len_long_be = (unsigned long long *) ((char *)frame + 2);
-    *payload_len_long_be = htobe64(len);
+    payload_len_32_be = (unsigned int *) ((char *)frame + 2);
+    *payload_len_32_be++ = 0;
+    *payload_len_32_be = htonl(len);
   }
   memcpy(frame + payload_offset, data, len);
 
@@ -345,8 +346,8 @@ libwebsock_handle_recv(struct bufferevent *bev, void *ptr)
   libwebsock_client_state *state = ptr;
   libwebsock_frame *current = NULL, *new = NULL;
   struct evbuffer *input;
-  struct evbuffer_iovec *iovec;
-  int i, datalen, err, n_vec, x, consumed; 
+  struct evbuffer_iovec *iovec, *iovec_mem;
+  int i, datalen, err, n_vec, consumed; 
   char *buf;
 
   input = bufferevent_get_input(bev);
@@ -355,13 +356,14 @@ libwebsock_handle_recv(struct bufferevent *bev, void *ptr)
     fprintf(stderr, "Weird evbuffer_peek returned 0 vectors available\n");
     return;
   }
-  iovec = (struct evbuffer_iovec *) malloc(sizeof(struct evbuffer_iovec) * n_vec);
+  iovec_mem = iovec = (struct evbuffer_iovec *) malloc(sizeof(struct evbuffer_iovec) * (n_vec + 1));
+  iovec[n_vec].iov_base = NULL;
   evbuffer_peek(input, -1, NULL, iovec, n_vec);
   consumed = 0;
-  for (x = 0; x < n_vec; x++) {
-    buf = iovec[x].iov_base;
-    datalen = iovec[x].iov_len;
+  while ((buf = iovec->iov_base) != NULL) {
+    datalen = iovec->iov_len;
     consumed += datalen;
+    iovec++;
     for (i = 0; i < datalen; i++) {
       current = state->current_frame;
       if (current == NULL) {
@@ -373,7 +375,7 @@ libwebsock_handle_recv(struct bufferevent *bev, void *ptr)
         state->current_frame = current;
       }
 
-      *(current->rawdata + current->rawdata_idx++) = buf[i];
+      *(current->rawdata + current->rawdata_idx++) = *buf++;
       if (current->state != sw_loaded_mask) {
         err = libwebsock_read_header(current);
         if (err == -1) {
@@ -465,7 +467,7 @@ libwebsock_handle_recv(struct bufferevent *bev, void *ptr)
     }
   }
   evbuffer_drain(input, consumed);
-  free(iovec);
+  free(iovec_mem);
 }
 
 void
@@ -488,9 +490,10 @@ libwebsock_fail_connection(libwebsock_client_state *state, unsigned short close_
 void
 libwebsock_dispatch_message(libwebsock_client_state *state, libwebsock_frame *current)
 {
+  unsigned int current_payload_len;
   unsigned long long message_payload_len, message_offset;
   int message_opcode, i;
-  char *message_payload;
+  char *message_payload, *message_payload_orig, *rawdata_ptr;
 
   if (state->flags & STATE_SENT_CLOSE_FRAME) {
      return;
@@ -509,12 +512,8 @@ libwebsock_dispatch_message(libwebsock_client_state *state, libwebsock_frame *cu
   first = current;
   message_opcode = current->opcode;
   message_payload = (char *) malloc(message_payload_len + 1);
+  message_payload_orig = message_payload;
 
-  //temp
-  int current_payload_len;
-  char *message_payload_orig = message_payload;
-  char *rawdata_ptr;
-  //end temp
   for (; current != NULL; current = current->next_frame) {
     current_payload_len = current->payload_len;
     rawdata_ptr = current->rawdata + current->payload_offset;

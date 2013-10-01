@@ -41,7 +41,7 @@ libwebsock_dump_frame(libwebsock_frame *frame)
   fprintf(stderr, "payload_offset: %d\n", frame->payload_offset);
   fprintf(stderr, "rawdata_idx: %d\n", frame->rawdata_idx);
   fprintf(stderr, "rawdata_sz: %d\n", frame->rawdata_sz);
-  fprintf(stderr, "payload_len: %llu\n", frame->payload_len);
+  fprintf(stderr, "payload_len: %u\n", frame->payload_len);
   fprintf(stderr, "Has previous frame: %d\n", frame->prev_frame != NULL ? 1 : 0);
   fprintf(stderr, "Has next frame: %d\n", frame->next_frame != NULL ? 1 : 0);
   fprintf(stderr, "Raw data:\n");
@@ -61,7 +61,7 @@ libwebsock_close(libwebsock_client_state *state)
 int
 libwebsock_close_with_reason(libwebsock_client_state *state, unsigned short code, const char *reason)
 {
-  unsigned long long len;
+  unsigned int len;
   unsigned short code_be;
   int ret;
   char buf[128]; //w3 spec on WebSockets API (http://dev.w3.org/html5/websockets/) says reason shouldn't be over 123 bytes.  I concur.
@@ -78,7 +78,7 @@ libwebsock_close_with_reason(libwebsock_client_state *state, unsigned short code
 }
 
 int
-libwebsock_send_text_with_length(libwebsock_client_state *state, char *strdata, unsigned long long payload_len)
+libwebsock_send_text_with_length(libwebsock_client_state *state, char *strdata, unsigned int payload_len)
 {
   int flags = WS_FRAGMENT_FIN | WS_OPCODE_TEXT;
   return libwebsock_send_fragment(state, strdata, payload_len, flags);
@@ -87,13 +87,13 @@ libwebsock_send_text_with_length(libwebsock_client_state *state, char *strdata, 
 int
 libwebsock_send_text(libwebsock_client_state *state, char *strdata)
 {
-  unsigned long long len = strlen(strdata);
+  unsigned int len = strlen(strdata);
   int flags = WS_FRAGMENT_FIN | WS_OPCODE_TEXT;
   return libwebsock_send_fragment(state, strdata, len, flags);
 }
 
 int
-libwebsock_send_binary(libwebsock_client_state *state, char *in_data, unsigned long long payload_len)
+libwebsock_send_binary(libwebsock_client_state *state, char *in_data, unsigned int payload_len)
 {
   int flags = WS_FRAGMENT_FIN | WS_OPCODE_BINARY;
   return libwebsock_send_fragment(state, in_data, payload_len, flags);

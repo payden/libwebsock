@@ -4,13 +4,13 @@
 AC_PREREQ([2.60])
 AC_INIT([libwebsock], [1.0.1], [payden@paydensutherland.com])
 AM_INIT_AUTOMAKE
-LT_INIT([disable-static])
+AC_DISABLE_STATIC
 AC_CONFIG_SRCDIR([src/websock.c])
 AC_CONFIG_HEADERS([src/config.h])
 AC_CONFIG_MACRO_DIR([m4])
 # Checks for programs.
 AC_PROG_CC
-
+AC_PROG_LIBTOOL
 AC_ARG_WITH([ssl],
   [AS_HELP_STRING([--without-ssl],[Disable building with SSL support])])
 

@@ -37,7 +37,7 @@ typedef struct _libwebsock_frame {
         unsigned int rawdata_sz;
         unsigned int size;
         unsigned int payload_len_short;
-        unsigned long long payload_len;
+        unsigned int payload_len;
         char *rawdata;
         struct _libwebsock_frame *next_frame;
         struct _libwebsock_frame *prev_frame;
