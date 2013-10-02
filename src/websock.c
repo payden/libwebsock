@@ -357,6 +357,10 @@ libwebsock_handle_recv(struct bufferevent *bev, void *ptr)
     return;
   }
   iovec_mem = iovec = (struct evbuffer_iovec *) malloc(sizeof(struct evbuffer_iovec) * (n_vec + 1));
+  if (!iovec_mem) {
+    fprintf(stderr, "Unable to allocate memory for io vectors.\n");
+    return;
+  }
   iovec[n_vec].iov_base = NULL;
   evbuffer_peek(input, -1, NULL, iovec, n_vec);
   consumed = 0;
