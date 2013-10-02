@@ -368,7 +368,7 @@ libwebsock_handle_recv(struct bufferevent *bev, void *ptr)
     datalen = iovec->iov_len;
     consumed += datalen;
     iovec++;
-    for (i = 0; i < datalen; i++) {
+    for (i = 0; i < datalen; ) {
       current = state->current_frame;
       if (current == NULL) {
         current = (libwebsock_frame *) malloc(sizeof(libwebsock_frame));
@@ -380,6 +380,7 @@ libwebsock_handle_recv(struct bufferevent *bev, void *ptr)
       }
 
       *(current->rawdata + current->rawdata_idx++) = *buf++;
+      i++;
       if (current->state != sw_loaded_mask) {
         err = libwebsock_read_header(current);
         if (err == -1) {
@@ -394,7 +395,17 @@ libwebsock_handle_recv(struct bufferevent *bev, void *ptr)
       }
 
       if (current->rawdata_idx < current->size) {
-        continue;
+        if (datalen - i >= current->size - current->rawdata_idx) {  //remaining in current vector completes frame.  Copy remaining frame size
+          memcpy(current->rawdata + current->rawdata_idx, buf, current->size - current->rawdata_idx);
+          buf += current->size - current->rawdata_idx;
+          i += current->size - current->rawdata_idx;
+          current->rawdata_idx = current->size;
+        } else { //not complete frame, copy the rest of this vector into frame.
+          memcpy(current->rawdata + current->rawdata_idx, buf, datalen - i);
+          current->rawdata_idx += datalen - i;
+          i = datalen;
+          continue;
+        }
       }
 
       if (state->flags & STATE_FAILING_CONNECTION) {
