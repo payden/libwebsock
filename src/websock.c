@@ -45,15 +45,6 @@ libwebsock_read_header(libwebsock_frame *frame)
       frame->opcode = *(frame->rawdata) & 0xf;
       frame->payload_len_short = *(frame->rawdata + 1) & 0x7f;
       frame->state = sw_got_short_len;
-      if ((*(frame->rawdata) & 0x70) != 0) {  //some reserved bits set
-        return -1;
-      }
-      if ((*(frame->rawdata) & 0xf8) == 0x08) { //continuation control frame. invalid.
-        return -1;
-      }
-      if ((*(frame->rawdata + 1) & 0x80) != 0x80) {
-        return -1;
-      }
     case sw_got_short_len:
       switch (frame->payload_len_short) {
         case 126:
