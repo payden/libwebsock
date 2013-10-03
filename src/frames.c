@@ -23,6 +23,60 @@
 #include "websock.h"
 
 void
+libwebsock_populate_frame_lookup_table(void)
+{
+  void (**t)(libwebsock_client_state *state);
+  void (*a)(libwebsock_client_state *state) = libwebsock_fail_and_cleanup;
+  void (*b)(libwebsock_client_state *state) = libwebsock_new_continuation_frame;
+  void (*c)(libwebsock_client_state *state) = libwebsock_handle_control_frame;
+  void (*d)(libwebsock_client_state *state) = libwebsock_dispatch_message;
+  int i;
+  t = libwebsock_frame_lookup_table;
+  for (i = 0; i < 512; i++) {
+    t[i] = a; //initialize all pointers to fail and cleanup
+  }
+
+  //special good cases
+  t[0x01] = b;
+  t[0x02] = b;
+  t[0x81] = d;
+  t[0x82] = d;
+  t[0x88] = c;
+  t[0x89] = c;
+  t[0x8a] = c;
+  t[0x100] = b;
+  t[0x180] = d;
+  t[0x188] = c;
+  t[0x189] = c;
+  t[0x18a] = c;
+
+}
+
+
+
+void
+libwebsock_fail_and_cleanup(libwebsock_client_state *state)
+{
+  libwebsock_fail_connection(state, WS_CLOSE_PROTOCOL_ERROR);
+  libwebsock_free_all_frames(state);
+  state->current_frame = NULL;
+}
+
+void
+libwebsock_new_continuation_frame(libwebsock_client_state *state)
+{
+  libwebsock_frame *current = state->current_frame;
+  libwebsock_frame *new = (libwebsock_frame *) malloc(sizeof(libwebsock_frame));
+  memset(new, 0, sizeof(libwebsock_frame));
+  new->rawdata = (char *) malloc(FRAME_CHUNK_LENGTH);
+  new->rawdata_sz = FRAME_CHUNK_LENGTH;
+  new->prev_frame = current;
+  current->next_frame = new;
+  state->current_frame = new;
+  state->flags |= STATE_RECEIVING_FRAGMENT; //don't care if this is already set
+}
+
+void
 libwebsock_free_all_frames(libwebsock_client_state *state)
 {
   libwebsock_frame *current, *next;
@@ -43,8 +97,9 @@ libwebsock_free_all_frames(libwebsock_client_state *state)
 }
 
 void
-libwebsock_handle_control_frame(libwebsock_client_state *state, libwebsock_frame *ctl_frame)
+libwebsock_handle_control_frame(libwebsock_client_state *state)
 {
+  libwebsock_frame *ctl_frame = state->current_frame;
   state->control_callback(state, ctl_frame);
   // Control frames can be injected in the midst of a fragmented message.
   // We need to maintain the link to previous frame if present.
