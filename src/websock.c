@@ -323,8 +323,9 @@ libwebsock_handle_recv(struct bufferevent *bev, void *ptr)
   libwebsock_frame *current = NULL;
   struct evbuffer *input;
   struct evbuffer_iovec *iovec, *iovec_mem;
-  int i, datalen, err, n_vec, consumed; 
+  int i, datalen, err, n_vec, consumed, in_fragment;
   char *buf;
+  void (*frame_fn)(libwebsock_client_state *state);
 
   input = bufferevent_get_input(bev);
   n_vec = evbuffer_peek(input, -1, NULL, NULL, 0);
@@ -394,17 +395,15 @@ libwebsock_handle_recv(struct bufferevent *bev, void *ptr)
         }
       }
 
-      int in_fragment = (state->flags & STATE_RECEIVING_FRAGMENT) ? 256 : 0;
+      in_fragment = (state->flags & STATE_RECEIVING_FRAGMENT) ? 256 : 0;
 
       assert(state->current_frame == current);
-      fprintf(stderr, "hex: %03x\n", in_fragment | (*current->rawdata & 0xff));
-      void (*frame_fn)(libwebsock_client_state *state) = libwebsock_frame_lookup_table[in_fragment | (*current->rawdata & 0xff)];
+
+      frame_fn = libwebsock_frame_lookup_table[in_fragment | (*current->rawdata & 0xff)];
 
       assert(frame_fn != NULL);
 
       frame_fn(state);
-
-
     }
   }
   evbuffer_drain(input, consumed);
