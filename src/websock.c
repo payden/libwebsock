@@ -472,6 +472,8 @@ libwebsock_dispatch_message(libwebsock_client_state *state)
       fprintf(stderr, "Error validating UTF-8 sequence.\n");
       free(message_payload_orig);
       libwebsock_fail_connection(state, WS_CLOSE_WRONG_TYPE);
+      libwebsock_cleanup_frames(first);
+      state->current_frame = NULL;
       return;
     }
   }
