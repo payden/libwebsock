@@ -397,11 +397,7 @@ libwebsock_handle_recv(struct bufferevent *bev, void *ptr)
 
       in_fragment = (state->flags & STATE_RECEIVING_FRAGMENT) ? 256 : 0;
 
-      assert(state->current_frame == current);
-
       frame_fn = libwebsock_frame_lookup_table[in_fragment | (*current->rawdata & 0xff)];
-
-      assert(frame_fn != NULL);
 
       frame_fn(state);
     }
