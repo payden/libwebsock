@@ -437,6 +437,7 @@ libwebsock_dispatch_message(libwebsock_client_state *state)
   libwebsock_frame *current = state->current_frame;
   char *message_payload, *message_payload_orig, *rawdata_ptr;
 
+  state->flags &= ~STATE_RECEIVING_FRAGMENT;
   if (state->flags & STATE_SENT_CLOSE_FRAME) {
      return;
   }
