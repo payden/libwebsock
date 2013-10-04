@@ -319,7 +319,7 @@ libwebsock_handle_recv(struct bufferevent *bev, void *ptr)
   libwebsock_client_state *state = ptr;
   libwebsock_frame *current = NULL;
   struct evbuffer *input;
-  struct evbuffer_iovec *iovec, *iovec_mem;
+  struct evbuffer_iovec iovec[8], *iovec_p;
   int i, datalen, err, n_vec, consumed, in_fragment;
   char *buf;
   void (*frame_fn)(libwebsock_client_state *state);
@@ -359,20 +359,16 @@ libwebsock_handle_recv(struct bufferevent *bev, void *ptr)
 
   input = bufferevent_get_input(bev);
   n_vec = evbuffer_peek(input, -1, NULL, NULL, 0);
-  if (!n_vec) {
-    fprintf(stderr, "Weird evbuffer_peek returned 0 vectors available\n");
-    return;
-  }
-  iovec_mem = iovec = (struct evbuffer_iovec *) malloc(sizeof(struct evbuffer_iovec) * (n_vec + 1));
-  if (!iovec_mem) {
-    fprintf(stderr, "Unable to allocate memory for io vectors.\n");
-    return;
-  }
+  //callback should never get triggered if there's no data available
+  //also, n_vec really shouldn't be over 2 right now according to libevent docs
+  //we'll allocate 8 on the stack just in case libevent changes.
+  assert(n_vec > 0 && n_vec < 8);
   iovec[n_vec].iov_base = NULL;
   evbuffer_peek(input, -1, NULL, iovec, n_vec);
+  iovec_p = iovec;
   consumed = 0;
-  while ((buf = iovec->iov_base) != NULL) {
-    datalen = (iovec++)->iov_len;
+  while ((buf = iovec_p->iov_base) != NULL) {
+    datalen = (iovec_p++)->iov_len;
     consumed += datalen;
     for (i = 0; i < datalen; ) {
       current = state->current_frame;
@@ -433,7 +429,6 @@ libwebsock_handle_recv(struct bufferevent *bev, void *ptr)
     }
   }
   evbuffer_drain(input, consumed);
-  free(iovec_mem);
 }
 
 void
