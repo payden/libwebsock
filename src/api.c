@@ -188,8 +188,6 @@ libwebsock_init_flags(int flags)
   ctx->control_callback = libwebsock_default_control_callback;
   ctx->onmessage = libwebsock_default_onmessage_callback;
 
-  libwebsock_populate_frame_lookup_table();
-
 #ifdef _WIN32
   WSADATA WSAData;
   WSAStartup(0x101, &WSAData);

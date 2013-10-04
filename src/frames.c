@@ -23,38 +23,6 @@
 #include "websock.h"
 
 void
-libwebsock_populate_frame_lookup_table(void)
-{
-  void (**t)(libwebsock_client_state *state);
-  void (*a)(libwebsock_client_state *state) = libwebsock_fail_and_cleanup;
-  void (*b)(libwebsock_client_state *state) = libwebsock_new_continuation_frame;
-  void (*c)(libwebsock_client_state *state) = libwebsock_handle_control_frame;
-  void (*d)(libwebsock_client_state *state) = libwebsock_dispatch_message;
-  int i;
-  t = libwebsock_frame_lookup_table;
-  for (i = 0; i < 512; i++) {
-    t[i] = a; //initialize all pointers to fail and cleanup
-  }
-
-  //special good cases
-  t[0x01] = b;
-  t[0x02] = b;
-  t[0x81] = d;
-  t[0x82] = d;
-  t[0x88] = c;
-  t[0x89] = c;
-  t[0x8a] = c;
-  t[0x100] = b;
-  t[0x180] = d;
-  t[0x188] = c;
-  t[0x189] = c;
-  t[0x18a] = c;
-
-}
-
-
-
-void
 libwebsock_fail_and_cleanup(libwebsock_client_state *state)
 {
   libwebsock_fail_connection(state, WS_CLOSE_PROTOCOL_ERROR);

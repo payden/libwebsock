@@ -21,9 +21,7 @@
 #define FRAMES_H_
 #include "types.h"
 
-void (*libwebsock_frame_lookup_table[512])(libwebsock_client_state *state);
 
-void libwebsock_populate_frame_lookup_table(void);
 void libwebsock_new_continuation_frame(libwebsock_client_state *state);
 void libwebsock_fail_and_cleanup(libwebsock_client_state *state);
 void libwebsock_free_all_frames(libwebsock_client_state *state);
