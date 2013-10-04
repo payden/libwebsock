@@ -50,6 +50,7 @@
 #include <ws2tcpip.h>
 #endif
 
+#include <assert.h>
 #include <stdint.h>
 #include <event2/event.h>
 #include <event2/buffer.h>
@@ -121,8 +122,8 @@ void libwebsock_populate_close_info_from_frame(libwebsock_close_info **info, lib
 void libwebsock_fail_connection(libwebsock_client_state *state, unsigned short close_code);
 void libwebsock_cleanup_context(libwebsock_context *ctx);
 void libwebsock_handle_signal(evutil_socket_t sig, short event, void *ptr);
-void libwebsock_handle_control_frame(libwebsock_client_state *state, libwebsock_frame *ctl_frame);
-void libwebsock_dispatch_message(libwebsock_client_state *state, libwebsock_frame *current);
+void libwebsock_handle_control_frame(libwebsock_client_state *state);
+void libwebsock_dispatch_message(libwebsock_client_state *state);
 void libwebsock_handle_accept(evutil_socket_t listener, short event, void *arg);
 void libwebsock_handle_send(struct bufferevent *bev, void *ptr);
 void libwebsock_handle_recv(struct bufferevent *bev, void *ptr);
