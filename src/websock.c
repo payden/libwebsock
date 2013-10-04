@@ -503,8 +503,12 @@ libwebsock_dispatch_message(libwebsock_client_state *state)
     }
   }
 
-  libwebsock_cleanup_frames(first);
-  state->current_frame = NULL;
+  libwebsock_cleanup_frames(first->next_frame);
+  first->rawdata_idx = 0;
+  first->next_frame = NULL;
+  first->payload_len = -1;
+  first->state = 0;
+  state->current_frame = first;
 
   libwebsock_message msg = { .opcode = message_opcode, .payload_len = message_payload_len, .payload = message_payload_orig };
   if (state->onmessage != NULL) {
