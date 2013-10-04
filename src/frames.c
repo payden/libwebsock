@@ -23,6 +23,28 @@
 #include "websock.h"
 
 void
+libwebsock_fail_and_cleanup(libwebsock_client_state *state)
+{
+  libwebsock_fail_connection(state, WS_CLOSE_PROTOCOL_ERROR);
+  libwebsock_free_all_frames(state);
+  state->current_frame = NULL;
+}
+
+void
+libwebsock_new_continuation_frame(libwebsock_client_state *state)
+{
+  libwebsock_frame *current = state->current_frame;
+  libwebsock_frame *new = (libwebsock_frame *) malloc(sizeof(libwebsock_frame));
+  memset(new, 0, sizeof(libwebsock_frame));
+  new->rawdata = (char *) malloc(FRAME_CHUNK_LENGTH);
+  new->rawdata_sz = FRAME_CHUNK_LENGTH;
+  new->prev_frame = current;
+  current->next_frame = new;
+  state->current_frame = new;
+  state->flags |= STATE_RECEIVING_FRAGMENT; //don't care if this is already set
+}
+
+void
 libwebsock_free_all_frames(libwebsock_client_state *state)
 {
   libwebsock_frame *current, *next;
@@ -43,8 +65,9 @@ libwebsock_free_all_frames(libwebsock_client_state *state)
 }
 
 void
-libwebsock_handle_control_frame(libwebsock_client_state *state, libwebsock_frame *ctl_frame)
+libwebsock_handle_control_frame(libwebsock_client_state *state)
 {
+  libwebsock_frame *ctl_frame = state->current_frame;
   state->control_callback(state, ctl_frame);
   // Control frames can be injected in the midst of a fragmented message.
   // We need to maintain the link to previous frame if present.

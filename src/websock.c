@@ -26,29 +26,11 @@
 #include "sha1.h"
 #include "base64.h"
 
-
-static inline void
-libwebsock_frame_act(libwebsock_client_state *state, libwebsock_frame *frame)
-{
-  switch (frame->opcode) {
-    case WS_OPCODE_CLOSE:
-    case WS_OPCODE_PING:
-    case WS_OPCODE_PONG:
-      libwebsock_handle_control_frame(state, frame);
-      break;
-    case WS_OPCODE_TEXT:
-    case WS_OPCODE_BINARY:
-    case WS_OPCODE_CONTINUE:
-      libwebsock_dispatch_message(state, frame);
-      state->current_frame = NULL;
-      break;
-    default:
-      libwebsock_cleanup_frames(frame);
-      state->current_frame = NULL;
-      libwebsock_fail_connection(state, WS_CLOSE_PROTOCOL_ERROR);
-      break;
-  }
-}
+//Define these here to avoid risk of collision if websock.h included in client program
+#define AA libwebsock_dispatch_message
+#define BB libwebsock_handle_control_frame
+#define CC libwebsock_new_continuation_frame
+#define DD libwebsock_fail_and_cleanup
 
 static inline int
 libwebsock_read_header(libwebsock_frame *frame)
@@ -69,15 +51,6 @@ libwebsock_read_header(libwebsock_frame *frame)
       frame->opcode = *(frame->rawdata) & 0xf;
       frame->payload_len_short = *(frame->rawdata + 1) & 0x7f;
       frame->state = sw_got_short_len;
-      if ((*(frame->rawdata) & 0x70) != 0) {  //some reserved bits set
-        return -1;
-      }
-      if ((*(frame->rawdata) & 0xf8) == 0x08) { //continuation control frame. invalid.
-        return -1;
-      }
-      if ((*(frame->rawdata + 1) & 0x80) != 0x80) {
-        return -1;
-      }
     case sw_got_short_len:
       switch (frame->payload_len_short) {
         case 126:
@@ -344,11 +317,45 @@ libwebsock_handle_recv(struct bufferevent *bev, void *ptr)
   // 1.) we're receiving the beginning of a new frame
   // 2.) we're receiving more data from a frame that was created previously and was not complete
   libwebsock_client_state *state = ptr;
-  libwebsock_frame *current = NULL, *new = NULL;
+  libwebsock_frame *current = NULL;
   struct evbuffer *input;
   struct evbuffer_iovec *iovec, *iovec_mem;
-  int i, datalen, err, n_vec, consumed; 
+  int i, datalen, err, n_vec, consumed, in_fragment;
   char *buf;
+  void (*frame_fn)(libwebsock_client_state *state);
+  static void (* const libwebsock_frame_lookup_table[512])(libwebsock_client_state *state) = {
+    DD, CC, CC, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, //00..0f
+    DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, //10..1f
+    DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, //20..2f
+    DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, //30..3f
+    DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, //40..4f
+    DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, //50..5f
+    DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, //60..6f
+    DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, //70..7f
+    DD, AA, AA, DD, DD, DD, DD, DD, BB, BB, BB, DD, DD, DD, DD, DD, //80..8f
+    DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, //90..9f
+    DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, //a0..af
+    DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, //b0..bf
+    DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, //c0..cf
+    DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, //d0..df
+    DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, //e0..ef
+    DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, //f0..ff
+    CC, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, //100..10f
+    DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, //110..11f
+    DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, //120..12f
+    DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, //130..13f
+    DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, //140..14f
+    DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, //150..15f
+    DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, //160..16f
+    DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, //170..17f
+    AA, DD, DD, DD, DD, DD, DD, DD, BB, BB, BB, DD, DD, DD, DD, DD, //180..18f
+    DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, //190..19f
+    DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, //1a0..1af
+    DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, //1b0..1bf
+    DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, //1c0..1cf
+    DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, //1d0..1df
+    DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD, DD  //1f0..1ff
+  };
 
   input = bufferevent_get_input(bev);
   n_vec = evbuffer_peek(input, -1, NULL, NULL, 0);
@@ -365,9 +372,8 @@ libwebsock_handle_recv(struct bufferevent *bev, void *ptr)
   evbuffer_peek(input, -1, NULL, iovec, n_vec);
   consumed = 0;
   while ((buf = iovec->iov_base) != NULL) {
-    datalen = iovec->iov_len;
+    datalen = (iovec++)->iov_len;
     consumed += datalen;
-    iovec++;
     for (i = 0; i < datalen; ) {
       current = state->current_frame;
       if (current == NULL) {
@@ -381,6 +387,7 @@ libwebsock_handle_recv(struct bufferevent *bev, void *ptr)
 
       *(current->rawdata + current->rawdata_idx++) = *buf++;
       i++;
+
       if (current->state != sw_loaded_mask) {
         err = libwebsock_read_header(current);
         if (err == -1) {
@@ -408,6 +415,8 @@ libwebsock_handle_recv(struct bufferevent *bev, void *ptr)
         }
       }
 
+      //have full frame at this point
+
       if (state->flags & STATE_FAILING_CONNECTION) {
         if (current->opcode != WS_OPCODE_CLOSE) {
           libwebsock_cleanup_frames(current);
@@ -416,69 +425,11 @@ libwebsock_handle_recv(struct bufferevent *bev, void *ptr)
         }
       }
 
-      if (state->flags & STATE_RECEIVING_FRAGMENT) {
-        if (current->fin == 1) {
-          if ((current->opcode & 0x8) == 0) {
-            if (current->opcode) { //non-ctrl and has opcode in the middle of fragment.  FAIL
-              libwebsock_fail_connection(state, WS_CLOSE_PROTOCOL_ERROR);
-              libwebsock_cleanup_frames(current);
-              state->current_frame = NULL;
-              continue;
-            }
-            state->flags &= ~STATE_RECEIVING_FRAGMENT;
-          }
-          libwebsock_frame_act(state, current);
-        } else {
-          //middle of fragment non-fin frame
-          if (current->opcode) { //cannot have opcode
-            libwebsock_fail_connection(state, WS_CLOSE_PROTOCOL_ERROR);
-            libwebsock_cleanup_frames(current);
-            state->current_frame = NULL;
-            continue;
-          }
-          new = (libwebsock_frame *) malloc(sizeof(libwebsock_frame));
-          memset(new, 0, sizeof(libwebsock_frame));
-          new->rawdata_sz = FRAME_CHUNK_LENGTH;
-          new->rawdata = (char *) malloc(new->rawdata_sz);
-          new->prev_frame = current;
-          current->next_frame = new;
-          state->current_frame = new;
-        }
-      } else {
-        if (current->fin == 1) {
-          //first frame and FIN, handle normally.
-          if (!current->opcode) { //must have opcode, cannot be continuation frame.
-            libwebsock_fail_connection(state, WS_CLOSE_PROTOCOL_ERROR);
-            libwebsock_cleanup_frames(current);
-            state->current_frame = NULL;
-            continue;
-          }
-          libwebsock_frame_act(state, current);
-          continue;
-        } else {
-          //new fragment series beginning
-          if (current->opcode & 0x8) { //can't fragment control frames.  FAIL
-            libwebsock_fail_connection(state, WS_CLOSE_PROTOCOL_ERROR);
-            libwebsock_cleanup_frames(current);
-            state->current_frame = NULL;
-            continue;
-          }
-          if (!current->opcode) { //new fragment series must have opcode.
-            libwebsock_fail_connection(state, WS_CLOSE_PROTOCOL_ERROR);
-            libwebsock_cleanup_frames(current);
-            state->current_frame = NULL;
-            continue;
-          }
-          new = (libwebsock_frame *) malloc(sizeof(libwebsock_frame));
-          memset(new, 0, sizeof(libwebsock_frame));
-          new->rawdata_sz = FRAME_CHUNK_LENGTH;
-          new->rawdata = (char *) malloc(new->rawdata_sz);
-          new->prev_frame = current;
-          current->next_frame = new;
-          state->current_frame = new;
-          state->flags |= STATE_RECEIVING_FRAGMENT;
-        }
-      }
+      in_fragment = (state->flags & STATE_RECEIVING_FRAGMENT) ? 256 : 0;
+
+      frame_fn = libwebsock_frame_lookup_table[in_fragment | (*current->rawdata & 0xff)];
+
+      frame_fn(state);
     }
   }
   evbuffer_drain(input, consumed);
@@ -503,13 +454,15 @@ libwebsock_fail_connection(libwebsock_client_state *state, unsigned short close_
 }
 
 void
-libwebsock_dispatch_message(libwebsock_client_state *state, libwebsock_frame *current)
+libwebsock_dispatch_message(libwebsock_client_state *state)
 {
   unsigned int current_payload_len;
   unsigned long long message_payload_len, message_offset;
   int message_opcode, i;
+  libwebsock_frame *current = state->current_frame;
   char *message_payload, *message_payload_orig, *rawdata_ptr;
 
+  state->flags &= ~STATE_RECEIVING_FRAGMENT;
   if (state->flags & STATE_SENT_CLOSE_FRAME) {
      return;
   }
@@ -544,11 +497,18 @@ libwebsock_dispatch_message(libwebsock_client_state *state, libwebsock_frame *cu
       fprintf(stderr, "Error validating UTF-8 sequence.\n");
       free(message_payload_orig);
       libwebsock_fail_connection(state, WS_CLOSE_WRONG_TYPE);
+      libwebsock_cleanup_frames(first);
+      state->current_frame = NULL;
       return;
     }
   }
 
-  libwebsock_cleanup_frames(first);
+  libwebsock_cleanup_frames(first->next_frame);
+  first->rawdata_idx = 0;
+  first->next_frame = NULL;
+  first->payload_len = -1;
+  first->state = 0;
+  state->current_frame = first;
 
   libwebsock_message msg = { .opcode = message_opcode, .payload_len = message_payload_len, .payload = message_payload_orig };
   if (state->onmessage != NULL) {
