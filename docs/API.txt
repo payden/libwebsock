@@ -158,3 +158,8 @@ with this context.  It calls epoll_create and stores the epoll_fd in the
 context.  It also allocates memory for the epoll event buffer which is
 pointed to by ctx->events.
 
+libwebsock_context *libwebsock_init_base(struct event_base *base, int
+flags)
+This function creates a new libwebsock_context, using the provided
+libevent event_base for handling all connections. The flags argument
+is passed to libevent_base_loop() by libwebsock_wait(). 
