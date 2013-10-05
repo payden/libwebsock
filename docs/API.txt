@@ -135,6 +135,11 @@ This function is called prior to libwebsock_wait and binds a listening
 socket to the supplied ip address and port.  It also adds this socket to
 the list of sockets that will be monitored by epoll in libwebsock_wait.
 
+void libwebsock_bind_socket(libwebsock_context *ctx, evutil_socket_t
+sockfd)
+Use an already created, listening socket (Or other type of file
+descriptor) for incoming websocket requests.
+
 void libwebsock_bind_ssl(libwebsock_context *ctx, char *listen_host,
 			  char *port, char *keyfile, char *certfile);
 This function is called prior to libwebsock_wait and binds a listening

@@ -115,10 +115,9 @@ void
 libwebsock_bind(libwebsock_context *ctx, char *listen_host, char *port)
 {
   struct addrinfo hints, *servinfo, *p;
-  struct event *listener_event;
-
   evutil_socket_t sockfd;
   int yes = 1;
+
   memset(&hints, 0, sizeof(struct addrinfo));
 
   hints.ai_family = AF_UNSPEC;
@@ -162,7 +161,13 @@ libwebsock_bind(libwebsock_context *ctx, char *listen_host, char *port)
     exit(-1);
   }
 
-  listener_event = event_new(ctx->base, sockfd, EV_READ | EV_PERSIST, libwebsock_handle_accept, (void *) ctx);
+  libwebsock_bind_socket(ctx,  sockfd);
+}
+
+void 
+libwebsock_bind_socket(libwebsock_context *ctx,  evutil_socket_t sockfd)
+{
+  struct event *listener_event = event_new(ctx->base, sockfd, EV_READ | EV_PERSIST, libwebsock_handle_accept, (void *) ctx);
   event_add(listener_event, NULL );
 }
 
@@ -232,4 +237,5 @@ libwebsock_init_base(struct event_base *base, int flags)
 
   return ctx;
 }
+
 
