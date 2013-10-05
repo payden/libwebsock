@@ -205,7 +205,7 @@ libwebsock_init_flags(int flags)
   if (!base)
     return NULL;
 
-  ctx =  libwebsock_init_base(base,  0);
+  ctx =  libwebsock_init_base(base,  flags);
   if (ctx)
     ctx->owns_base = 1;
   return ctx;
