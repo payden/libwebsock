@@ -165,10 +165,10 @@ libwebsock_bind(libwebsock_context *ctx, char *listen_host, char *port)
 }
 
 void 
-libwebsock_bind_socket(libwebsock_context *ctx,  evutil_socket_t sockfd)
+libwebsock_bind_socket(libwebsock_context *ctx, evutil_socket_t sockfd)
 {
   struct event *listener_event = event_new(ctx->base, sockfd, EV_READ | EV_PERSIST, libwebsock_handle_accept, (void *) ctx);
-  event_add(listener_event, NULL );
+  event_add(listener_event, NULL);
 }
 
 static struct event_base *
@@ -187,12 +187,14 @@ libwebsock_init(void)
   libwebsock_context *ctx;
   struct event_base *base = libwebsock_make_event_base();
 
-  if (!base)
+  if (!base) {
     return NULL;
+  }
 
-  ctx =  libwebsock_init_base(base,  0);
-  if (ctx)
+  ctx = libwebsock_init_base(base, 0);
+  if (ctx) {
     ctx->owns_base = 1;
+  }
   return ctx;
 }
 
@@ -202,12 +204,14 @@ libwebsock_init_flags(int flags)
   libwebsock_context *ctx;
   struct event_base *base = libwebsock_make_event_base();
 
-  if (!base)
+  if (!base) {
     return NULL;
+  }
 
-  ctx =  libwebsock_init_base(base,  flags);
-  if (ctx)
+  ctx = libwebsock_init_base(base, flags);
+  if (ctx) {
     ctx->owns_base = 1;
+  }
   return ctx;
 }
 
