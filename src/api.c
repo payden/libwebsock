@@ -166,13 +166,48 @@ libwebsock_bind(libwebsock_context *ctx, char *listen_host, char *port)
   event_add(listener_event, NULL );
 }
 
+static struct event_base *
+libwebsock_make_event_base(void) {
+  struct event_base *base = event_base_new();
+  if (!base) {
+    fprintf(stderr, "Unable to create new event base.\n");
+    return NULL;
+  }
+  return base;
+}
+
 libwebsock_context *
-libwebsock_init(void) {
-  return libwebsock_init_flags(0);
+libwebsock_init(void) 
+{
+  libwebsock_context *ctx;
+  struct event_base *base = libwebsock_make_event_base();
+
+  if (!base)
+    return NULL;
+
+  ctx =  libwebsock_init_base(base,  0);
+  if (ctx)
+    ctx->owns_base = 1;
+  return ctx;
 }
 
 libwebsock_context *
 libwebsock_init_flags(int flags)
+{
+  libwebsock_context *ctx;
+  struct event_base *base = libwebsock_make_event_base();
+
+  if (!base)
+    return NULL;
+
+  ctx =  libwebsock_init_base(base,  0);
+  if (ctx)
+    ctx->owns_base = 1;
+  return ctx;
+}
+
+libwebsock_context *
+libwebsock_init_base(struct event_base *base, int flags)
 {
   libwebsock_context *ctx;
   ctx = (libwebsock_context *) malloc(sizeof(libwebsock_context));
@@ -182,6 +217,7 @@ libwebsock_init_flags(int flags)
   }
   memset(ctx, 0, sizeof(libwebsock_context));
 
+  ctx->base = base;
   ctx->flags = flags;
   ctx->onclose = libwebsock_default_onclose_callback;
   ctx->onopen = libwebsock_default_onopen_callback;
@@ -193,12 +229,6 @@ libwebsock_init_flags(int flags)
   WSAStartup(0x101, &WSAData);
 #endif
 
-  ctx->base = event_base_new();
-  if (!ctx->base) {
-    free(ctx);
-    fprintf(stderr, "Unable to create new event base.\n");
-    return NULL;
-  }
 
   return ctx;
 }

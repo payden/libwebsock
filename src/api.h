@@ -31,6 +31,7 @@ void libwebsock_wait(libwebsock_context *ctx);
 void libwebsock_bind(libwebsock_context *ctx, char *listen_host, char *port);
 libwebsock_context *libwebsock_init(void);
 libwebsock_context *libwebsock_init_flags(int flags);
+libwebsock_context *libwebsock_init_base(struct event_base *base, int flags);
 
 #ifdef WEBSOCK_HAVE_SSL
 void libwebsock_bind_ssl(libwebsock_context *ctx, char *listen_host, char *port, char *keyfile, char *certfile);
