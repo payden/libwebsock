@@ -71,3 +71,36 @@ validate_utf8_sequence(uint8_t *s)
 
   return state == UTF8_ACCEPT;
 }
+
+void *
+lws_calloc(size_t size)
+{
+  void *alloc = calloc(1, size);
+  if (!alloc) {
+    fprintf(stderr, "Failed calloc!  Exiting.\n");
+    exit(-1);
+  }
+  return alloc;
+}
+
+void *
+lws_malloc(size_t size)
+{
+  void *alloc = malloc(size);
+  if (!alloc) {
+    fprintf(stderr, "Failed malloc!  Exiting.\n");
+    exit(-1);
+  }
+  return alloc;
+}
+
+void *
+lws_realloc(void *ptr, size_t size)
+{
+  void *new = realloc(ptr, size);
+  if (!new) {
+    fprintf(stderr, "Failed realloc!  Exiting.\n");
+    exit(-1);
+  }
+  return new;
+}

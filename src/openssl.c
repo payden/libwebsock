@@ -35,26 +35,14 @@ libwebsock_handle_accept_ssl(evutil_socket_t listener, short event, void *arg)
   if (fd < 0) {
     fprintf(stderr, "Error accepting new connection.\n");
   } else {
-    client_state = (libwebsock_client_state *) malloc(sizeof(libwebsock_client_state));
-    if (!client_state) {
-      fprintf(stderr, "Unable to allocate memory for new connection state structure.\n");
-      close(fd);
-      return;
-    }
-    memset(client_state, 0, sizeof(libwebsock_client_state));
+    client_state = (libwebsock_client_state *) lws_calloc(sizeof(libwebsock_client_state));
     client_state->sockfd = fd;
     client_state->flags |= STATE_CONNECTING | STATE_IS_SSL;
     client_state->control_callback = ctx->control_callback;
     client_state->onopen = ctx->onopen;
     client_state->onmessage = ctx->onmessage;
     client_state->onclose = ctx->onclose;
-    client_state->sa = (struct sockaddr_storage *) malloc(sizeof(struct sockaddr_storage));
-    if (!client_state->sa) {
-      fprintf(stderr, "Unable to allocate memory for sockaddr_storage.\n");
-      free(client_state);
-      close(fd);
-      return;
-    }
+    client_state->sa = (struct sockaddr_storage *) lws_malloc(sizeof(struct sockaddr_storage));
     memcpy(client_state->sa, &ss, sizeof(struct sockaddr_storage));
     client_state->ssl = SSL_new(ssl_ctx);
     SSL_set_fd(client_state->ssl, fd);
@@ -88,12 +76,7 @@ libwebsock_bind_ssl_real(libwebsock_context *ctx, char *listen_host, char *port,
   int sockfd, yes = 1;
   SSL_CTX *ssl_ctx;
 
-  evdata = (libwebsock_ssl_event_data *) malloc(sizeof(libwebsock_ssl_event_data));
-  if (!evdata) {
-    fprintf(stderr, "Unable to allocate memory for ssl_event_data.\n");
-    exit(1);
-  }
-  memset(evdata, 0, sizeof(libwebsock_ssl_event_data));
+  evdata = (libwebsock_ssl_event_data *) lws_calloc(sizeof(libwebsock_ssl_event_data));
 
   if (!ctx->ssl_init) {
     SSL_library_init();

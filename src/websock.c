@@ -96,7 +96,7 @@ libwebsock_read_header(libwebsock_frame *frame)
         new_size |= new_size >> 16;
         new_size++;
         frame->rawdata_sz = new_size;
-        frame->rawdata = (char *) realloc(frame->rawdata, new_size);
+        frame->rawdata = (char *) lws_realloc(frame->rawdata, new_size);
       }
       return 1;
     case sw_loaded_mask:
@@ -123,13 +123,8 @@ libwebsock_populate_close_info_from_frame(libwebsock_close_info **info, libwebso
     return;
   }
 
-  new_info = (libwebsock_close_info *) malloc(sizeof(libwebsock_close_info));
-  if (!new_info) {
-    fprintf(stderr, "Error allocating memory for libwebsock_close_info structure.\n");
-    return;
-  }
+  new_info = (libwebsock_close_info *) lws_calloc(sizeof(libwebsock_close_info));
 
-  memset(new_info, 0, sizeof(libwebsock_close_info));
   memcpy(&code_be, close_frame->rawdata + close_frame->payload_offset, 2);
   at_most = close_frame->payload_len - 2;
   at_most = at_most > 124 ? 124 : at_most;
@@ -238,7 +233,7 @@ libwebsock_send_fragment(libwebsock_client_state *state, const char *data, unsig
     fprintf(stderr, "libwebsock does not support frame payload sizes over %u bytes long\n", 0xfffffff0);
     return -1;
   }
-  frame = (char *) malloc(frame_size);
+  frame = (char *) lws_malloc(frame_size);
   payload_len_small &= 0x7f;
   *frame = finNopcode;
   *(frame + 1) = payload_len_small;
@@ -269,26 +264,14 @@ libwebsock_handle_accept(evutil_socket_t listener, short event, void *arg)
   if (fd < 0) {
     fprintf(stderr, "Error accepting new connection.\n");
   } else {
-    client_state = (libwebsock_client_state *) malloc(sizeof(libwebsock_client_state));
-    if (!client_state) {
-      fprintf(stderr, "Unable to allocate memory for new connection state structure.\n");
-      close(fd);
-      return;
-    }
-    memset(client_state, 0, sizeof(libwebsock_client_state));
+    client_state = (libwebsock_client_state *) lws_calloc(sizeof(libwebsock_client_state));
     client_state->sockfd = fd;
     client_state->flags |= STATE_CONNECTING;
     client_state->control_callback = ctx->control_callback;
     client_state->onopen = ctx->onopen;
     client_state->onmessage = ctx->onmessage;
     client_state->onclose = ctx->onclose;
-    client_state->sa = (struct sockaddr_storage *) malloc(sizeof(struct sockaddr_storage));
-    if (!client_state->sa) {
-      fprintf(stderr, "Unable to allocate memory for sockaddr_storage.\n");
-      free(client_state);
-      close(fd);
-      return;
-    }
+    client_state->sa = (struct sockaddr_storage *) lws_malloc(sizeof(struct sockaddr_storage));
     client_state->ctx = (void *) ctx;
     memcpy(client_state->sa, &ss, sizeof(struct sockaddr_storage));
     evutil_make_socket_nonblocking(fd);
@@ -373,11 +356,10 @@ libwebsock_handle_recv(struct bufferevent *bev, void *ptr)
     for (i = 0; i < datalen; ) {
       current = state->current_frame;
       if (current == NULL) {
-        current = (libwebsock_frame *) malloc(sizeof(libwebsock_frame));
-        memset(current, 0, sizeof(libwebsock_frame));
+        current = (libwebsock_frame *) lws_calloc(sizeof(libwebsock_frame));
         current->payload_len = -1;
         current->rawdata_sz = FRAME_CHUNK_LENGTH;
-        current->rawdata = (char *) malloc(FRAME_CHUNK_LENGTH);
+        current->rawdata = (char *) lws_malloc(FRAME_CHUNK_LENGTH);
         state->current_frame = current;
       }
 
@@ -474,7 +456,7 @@ libwebsock_dispatch_message(libwebsock_client_state *state)
   message_payload_len += current->payload_len;
   first = current;
   message_opcode = current->opcode;
-  message_payload = (char *) malloc(message_payload_len + 1);
+  message_payload = (char *) lws_malloc(message_payload_len + 1);
   message_payload_orig = message_payload;
 
   for (; current != NULL; current = current->next_frame) {
@@ -533,17 +515,11 @@ libwebsock_handshake_finish(struct bufferevent *bev, libwebsock_client_state *st
 
   output = bufferevent_get_output(bev);
 
-  headers = (char *) malloc(str->data_sz + 1);
-  if (!headers) {
-    fprintf(stderr, "Unable to allocate memory in libwebsock_handshake..\n");
-    bufferevent_free(bev);
-    return;
-  }
-  memset(headers, 0, str->data_sz + 1);
+  headers = (char *) lws_calloc(str->data_sz + 1);
   strncpy(headers, str->data, str->idx);
   for (tok = strtok(headers, "\r\n"); tok != NULL; tok = strtok(NULL, "\r\n")) {
     if (strstr(tok, "Sec-WebSocket-Key: ") != NULL) {
-      key = (char *) malloc(strlen(tok));
+      key = (char *) lws_malloc(strlen(tok));
       strncpy(key, tok + strlen("Sec-WebSocket-Key: "), strlen(tok));
       break;
     }
@@ -571,7 +547,7 @@ libwebsock_handshake_finish(struct bufferevent *bev, libwebsock_client_state *st
   for (n = 0; n < (strlen(sha1buf) / 2); n++) {
     sscanf(sha1buf + (n * 2), "%02hhx", sha1mac + n);
   }
-  base64buf = (char *) malloc(256);
+  base64buf = (char *) lws_malloc(256);
   base64_encode(sha1mac, 20, base64buf, 256);
   memset(buf, 0, 1024);
   snprintf(buf, 1024,
@@ -605,34 +581,17 @@ libwebsock_handshake(struct bufferevent *bev, void *ptr)
   input = bufferevent_get_input(bev);
   str = state->data;
   if (!str) {
-    state->data = (libwebsock_string *) malloc(sizeof(libwebsock_string));
-    if (!state->data) {
-      fprintf(stderr, "Unable to allocate memory in libwebsock_handshake.\n");
-      bufferevent_free(bev);
-      return;
-    }
+    state->data = (libwebsock_string *) lws_calloc(sizeof(libwebsock_string));
     str = state->data;
-    memset(str, 0, sizeof(libwebsock_string));
     str->data_sz = FRAME_CHUNK_LENGTH;
-    str->data = (char *) malloc(str->data_sz);
-    if (!str->data) {
-      fprintf(stderr, "Unable to allocate memory in libwebsock_handshake.\n");
-      bufferevent_free(bev);
-      return;
-    }
-    memset(str->data, 0, str->data_sz);
+    str->data = (char *) lws_calloc(str->data_sz);
   }
 
   while (evbuffer_get_length(input)) {
     datalen = evbuffer_remove(input, buf, sizeof(buf));
 
     if (str->idx + datalen >= str->data_sz) {
-      str->data = realloc(str->data, str->data_sz * 2 + datalen);
-      if (!str->data) {
-        fprintf(stderr, "Failed realloc.\n");
-        bufferevent_free(bev);
-        return;
-      }
+      str->data = lws_realloc(str->data, str->data_sz * 2 + datalen);
       str->data_sz += str->data_sz + datalen;
       memset(str->data + str->idx, 0, str->data_sz - str->idx);
     }

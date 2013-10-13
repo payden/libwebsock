@@ -55,7 +55,7 @@ libwebsock_dump_frame(libwebsock_frame *frame)
 int
 libwebsock_close(libwebsock_client_state *state)
 {
-  return libwebsock_close_with_reason(state, WS_CLOSE_NORMAL, NULL );
+  return libwebsock_close_with_reason(state, WS_CLOSE_NORMAL, NULL);
 }
 
 int
@@ -219,12 +219,7 @@ libwebsock_context *
 libwebsock_init_base(struct event_base *base, int flags)
 {
   libwebsock_context *ctx;
-  ctx = (libwebsock_context *) malloc(sizeof(libwebsock_context));
-  if (!ctx) {
-    fprintf(stderr, "Unable to allocate memory for libwebsock context.\n");
-    return ctx;
-  }
-  memset(ctx, 0, sizeof(libwebsock_context));
+  ctx = (libwebsock_context *) lws_calloc(sizeof(libwebsock_context));
 
   ctx->base = base;
   ctx->flags = flags;

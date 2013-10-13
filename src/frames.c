@@ -34,9 +34,8 @@ void
 libwebsock_new_continuation_frame(libwebsock_client_state *state)
 {
   libwebsock_frame *current = state->current_frame;
-  libwebsock_frame *new = (libwebsock_frame *) malloc(sizeof(libwebsock_frame));
-  memset(new, 0, sizeof(libwebsock_frame));
-  new->rawdata = (char *) malloc(FRAME_CHUNK_LENGTH);
+  libwebsock_frame *new = (libwebsock_frame *) lws_calloc(sizeof(libwebsock_frame));
+  new->rawdata = (char *) lws_malloc(FRAME_CHUNK_LENGTH);
   new->rawdata_sz = FRAME_CHUNK_LENGTH;
   new->prev_frame = current;
   current->next_frame = new;

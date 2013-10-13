@@ -26,5 +26,7 @@ uint16_t lws_htobe16(uint16_t x);
 uint16_t lws_be16toh(uint16_t x);
 uint64_t lws_htobe64(uint64_t x);
 uint64_t lws_be64toh(uint64_t x);
-
+void *lws_malloc(size_t size);
+void *lws_calloc(size_t size);
+void *lws_realloc(void *ptr, size_t size);
 #endif /* UTIL_H_ */
