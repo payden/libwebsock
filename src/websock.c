@@ -1,18 +1,18 @@
 /*
  * This file is part of libwebsock
  *
- * Copyright (C) 2012 Payden Sutherland
+ * Copyright (C) 2012-2013 Payden Sutherland
  *
  * libwebsock is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
+ * it under the terms of the GNU Lesser General Public License as published by
  * the Free Software Foundation; version 3 of the License.
  *
  * libwebsock is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Lesser General Public License
  * along with libwebsock; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA
  */
@@ -434,7 +434,7 @@ void
 libwebsock_dispatch_message(libwebsock_client_state *state)
 {
   unsigned int current_payload_len;
-  unsigned long long message_payload_len, message_offset;
+  unsigned long long message_payload_len;
   int message_opcode, i;
   libwebsock_frame *current = state->current_frame;
   char *message_payload, *message_payload_orig, *rawdata_ptr;
@@ -448,7 +448,6 @@ libwebsock_dispatch_message(libwebsock_client_state *state)
     fprintf(stderr, "Somehow, null pointer passed to libwebsock_dispatch_message.\n");
     exit(1);
   }
-  message_offset = 0;
   message_payload_len = 0;
   for (; current->prev_frame != NULL; current = current->prev_frame) {
     message_payload_len += current->payload_len;
