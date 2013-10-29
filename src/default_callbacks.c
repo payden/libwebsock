@@ -112,6 +112,9 @@ libwebsock_default_control_callback(libwebsock_client_state *state, libwebsock_f
       evbuffer_add(output, ctl_frame->rawdata, ctl_frame->payload_offset + ctl_frame->payload_len);
       break;
     case WS_OPCODE_PONG:
+      if (state->onpong != NULL) {
+        state->onpong(state);
+      }
       break;
     default:
       libwebsock_fail_connection(state, WS_CLOSE_PROTOCOL_ERROR);

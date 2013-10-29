@@ -74,6 +74,7 @@ typedef struct _libwebsock_client_state {
         int (*control_callback)(struct _libwebsock_client_state *, libwebsock_frame *);
         int (*onopen)(struct _libwebsock_client_state *);
         int (*onclose)(struct _libwebsock_client_state *);
+        int (*onpong)(struct _libwebsock_client_state *);
 #ifdef WEBSOCK_HAVE_SSL
         SSL *ssl;
 #endif
@@ -91,6 +92,7 @@ typedef struct _libwebsock_context {
         int (*control_callback)(libwebsock_client_state *, libwebsock_frame *);
         int (*onopen)(libwebsock_client_state *);
         int (*onclose)(libwebsock_client_state *);
+        int (*onpong)(libwebsock_client_state *);
 } libwebsock_context;
 
 

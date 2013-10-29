@@ -271,6 +271,7 @@ libwebsock_handle_accept(evutil_socket_t listener, short event, void *arg)
     client_state->onopen = ctx->onopen;
     client_state->onmessage = ctx->onmessage;
     client_state->onclose = ctx->onclose;
+    client_state->onpong = ctx->onpong;
     client_state->sa = (struct sockaddr_storage *) lws_malloc(sizeof(struct sockaddr_storage));
     client_state->ctx = (void *) ctx;
     memcpy(client_state->sa, &ss, sizeof(struct sockaddr_storage));
