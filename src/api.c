@@ -53,6 +53,12 @@ libwebsock_dump_frame(libwebsock_frame *frame)
 }
 
 int
+libwebsock_ping(libwebsock_client_state *state)
+{
+  return libwebsock_send_fragment(state, NULL, 0, 0x89);
+}
+
+int
 libwebsock_close(libwebsock_client_state *state)
 {
   return libwebsock_close_with_reason(state, WS_CLOSE_NORMAL, NULL);

@@ -22,6 +22,7 @@
 
 #include "types.h"
 
+int libwebsock_ping(libwebsock_client_state *state);
 int libwebsock_close(libwebsock_client_state *state);
 int libwebsock_close_with_reason(libwebsock_client_state *state, unsigned short code, const char *reason);
 int libwebsock_send_binary(libwebsock_client_state *state, char *in_data, unsigned int payload_len);
