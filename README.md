@@ -8,6 +8,8 @@ of the WebSocket protocol or even specifics of C sockets.
 
 Installation instructions can be found [here][6].
 
+API reference & usage instructions can be found [here][7].
+
 To get started, have a look at [echo.c][1] in the examples directory of the package.  A
 simple echo server is implemented.
 
@@ -32,3 +34,4 @@ Current Travis CI Build Status:
  [4]: https://travis-ci.org/payden/libwebsock.png
  [5]: https://travis-ci.org/payden/libwebsock
  [6]: https://github.com/payden/libwebsock/wiki/Installation
+ [7]: https://github.com/payden/libwebsock/wiki/API
