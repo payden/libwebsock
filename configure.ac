@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.60])
-AC_INIT([libwebsock], [1.0.2], [payden@paydensutherland.com])
+AC_INIT([libwebsock], [1.0.3], [payden@paydensutherland.com])
 AM_INIT_AUTOMAKE
 AC_DISABLE_STATIC
 AC_CONFIG_SRCDIR([src/websock.c])
