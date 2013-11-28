@@ -80,6 +80,8 @@ typedef struct _libwebsock_client_state {
 #endif
         libwebsock_close_info *close_info;
         void *ctx;
+        struct _libwebsock_client_state *next;
+        struct _libwebsock_client_state *prev;
 } libwebsock_client_state;
 
 typedef struct _libwebsock_context {
@@ -93,6 +95,7 @@ typedef struct _libwebsock_context {
         int (*onopen)(libwebsock_client_state *);
         int (*onclose)(libwebsock_client_state *);
         int (*onpong)(libwebsock_client_state *);
+        libwebsock_client_state *clients_HEAD;
 } libwebsock_context;
 
 

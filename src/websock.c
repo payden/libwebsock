@@ -141,6 +141,16 @@ libwebsock_shutdown(libwebsock_client_state *state)
   libwebsock_context *ctx = (libwebsock_context *) state->ctx;
   struct event *ev;
   struct timeval tv = { 1, 0 };
+  if (ctx->clients_HEAD == state) {
+    ctx->clients_HEAD = state->next;
+  }
+  if (state->prev != NULL) {
+    state->prev->next = state->next;
+  }
+  if (state->next != NULL) {
+    state->next->prev = state->prev;
+  }
+
   if ((state->flags & STATE_CONNECTED) && state->onclose) {
     state->onclose(state);
   }
@@ -500,6 +510,7 @@ void
 libwebsock_handshake_finish(struct bufferevent *bev, libwebsock_client_state *state)
 {
   //TODO: this is shite.  Clean it up.
+  libwebsock_context *ctx = (libwebsock_context *) state->ctx;
   libwebsock_string *str = state->data;
   struct evbuffer *output;
   char buf[1024];
@@ -563,6 +574,12 @@ libwebsock_handshake_finish(struct bufferevent *bev, libwebsock_client_state *st
 
   state->flags &= ~STATE_CONNECTING;
   state->flags |= STATE_CONNECTED;
+
+  state->next = ctx->clients_HEAD;
+  if (state->next) {
+    state->next->prev = state;
+  }
+  ctx->clients_HEAD = state;
 
   if (state->onopen != NULL) {
     state->onopen(state);

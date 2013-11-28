@@ -26,6 +26,7 @@ int libwebsock_ping(libwebsock_client_state *state);
 int libwebsock_close(libwebsock_client_state *state);
 int libwebsock_close_with_reason(libwebsock_client_state *state, unsigned short code, const char *reason);
 int libwebsock_send_binary(libwebsock_client_state *state, char *in_data, unsigned int payload_len);
+int libwebsock_send_all_text(libwebsock_context *ctx, char *strdata);
 int libwebsock_send_text(libwebsock_client_state *state, char *strdata);
 int libwebsock_send_text_with_length(libwebsock_client_state *state, char *strdata, unsigned int payload_len);
 void libwebsock_wait(libwebsock_context *ctx);
