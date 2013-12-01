@@ -91,6 +91,15 @@
 /* Define if building SSL support */
 #define WEBSOCK_HAVE_SSL 1
 
+/* libwebsock package name */
+#define WEBSOCK_PACKAGE_NAME "libwebsock"
+
+/* libwebsock package string */
+#define WEBSOCK_PACKAGE_STRING "libwebsock 1.0.3"
+
+/* libwebsock version */
+#define WEBSOCK_PACKAGE_VERSION "1.0.3"
+
 /* Define to rpl_malloc if the replacement function should be used. */
 /* #undef malloc */
 

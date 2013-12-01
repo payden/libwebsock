@@ -566,7 +566,7 @@ libwebsock_handshake_finish(struct bufferevent *bev, libwebsock_client_state *st
       "Server: %s/%s\r\n"
       "Upgrade: websocket\r\n"
       "Connection: Upgrade\r\n"
-      "Sec-WebSocket-Accept: %s\r\n\r\n", PACKAGE_NAME, PACKAGE_VERSION, base64buf);
+      "Sec-WebSocket-Accept: %s\r\n\r\n", WEBSOCK_PACKAGE_NAME, WEBSOCK_PACKAGE_VERSION, base64buf);
   free(base64buf);
 
   evbuffer_add(output, buf, strlen(buf));

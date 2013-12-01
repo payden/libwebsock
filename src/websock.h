@@ -17,7 +17,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA
  */
 
-#include "config.h"
+#include "websock_config.h"
 
 //this bit hides differences between systems on big-endian conversions
 #if defined(__linux__)

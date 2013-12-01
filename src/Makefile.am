@@ -1,4 +1,4 @@
-LIBWEBSOCK_LIBRARY_VERSION=1:2:0
+LIBWEBSOCK_LIBRARY_VERSION=1:3:0
 lib_LTLIBRARIES=libwebsock.la
 
 if HAVE_SSL
@@ -10,5 +10,5 @@ endif
 libwebsock_la_LDFLAGS = -version-info $(LIBWEBSOCK_LIBRARY_VERSION)
 libwebsock_la_CFLAGS = -Wall -Wmissing-prototypes
 library_includedir=$(includedir)/websock
-library_include_HEADERS = websock.h config.h api.h default_callbacks.h frames.h util.h utf.h types.h
+library_include_HEADERS = websock.h api.h default_callbacks.h frames.h util.h utf.h types.h websock_config.h
 ACLOCAL_AMFLAGS = -I m4

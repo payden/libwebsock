@@ -33,7 +33,7 @@
 char *
 libwebsock_version_string(void)
 {
-  return PACKAGE_STRING;
+  return WEBSOCK_PACKAGE_STRING;
 }
 
 void
