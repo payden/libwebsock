@@ -71,7 +71,7 @@
 #define PACKAGE_NAME "libwebsock"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "libwebsock 1.0.3"
+#define PACKAGE_STRING "libwebsock 1.0.4"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "libwebsock"
@@ -80,13 +80,13 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "1.0.3"
+#define PACKAGE_VERSION "1.0.4"
 
 /* Define to 1 if you have the ANSI C header files. */
 #define STDC_HEADERS 1
 
 /* Version number of package */
-#define VERSION "1.0.3"
+#define VERSION "1.0.4"
 
 /* Define if building SSL support */
 #define WEBSOCK_HAVE_SSL 1
@@ -95,10 +95,10 @@
 #define WEBSOCK_PACKAGE_NAME "libwebsock"
 
 /* libwebsock package string */
-#define WEBSOCK_PACKAGE_STRING "libwebsock 1.0.3"
+#define WEBSOCK_PACKAGE_STRING "libwebsock 1.0.4"
 
 /* libwebsock version */
-#define WEBSOCK_PACKAGE_VERSION "1.0.3"
+#define WEBSOCK_PACKAGE_VERSION "1.0.4"
 
 /* Define to rpl_malloc if the replacement function should be used. */
 /* #undef malloc */

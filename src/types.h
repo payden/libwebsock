@@ -96,6 +96,7 @@ typedef struct _libwebsock_context {
         int (*onclose)(libwebsock_client_state *);
         int (*onpong)(libwebsock_client_state *);
         libwebsock_client_state *clients_HEAD;
+        void *user_data; //context specific user data
 } libwebsock_context;
 
 
