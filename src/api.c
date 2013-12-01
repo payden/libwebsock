@@ -30,6 +30,11 @@
 #include "websock.h"
 
 
+char *
+libwebsock_version_string(void)
+{
+  return PACKAGE_STRING;
+}
 
 void
 libwebsock_dump_frame(libwebsock_frame *frame)
