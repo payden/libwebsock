@@ -273,24 +273,25 @@ libwebsock_handle_accept(evutil_socket_t listener, short event, void *arg)
   int fd = accept(listener, (struct sockaddr *) &ss, &slen);
   if (fd < 0) {
     fprintf(stderr, "Error accepting new connection.\n");
-  } else {
-    client_state = (libwebsock_client_state *) lws_calloc(sizeof(libwebsock_client_state));
-    client_state->sockfd = fd;
-    client_state->flags |= STATE_CONNECTING;
-    client_state->control_callback = ctx->control_callback;
-    client_state->onopen = ctx->onopen;
-    client_state->onmessage = ctx->onmessage;
-    client_state->onclose = ctx->onclose;
-    client_state->onpong = ctx->onpong;
-    client_state->sa = (struct sockaddr_storage *) lws_malloc(sizeof(struct sockaddr_storage));
-    client_state->ctx = (void *) ctx;
-    memcpy(client_state->sa, &ss, sizeof(struct sockaddr_storage));
-    evutil_make_socket_nonblocking(fd);
-    bev = bufferevent_socket_new(ctx->base, fd, BEV_OPT_CLOSE_ON_FREE);
-    client_state->bev = bev;
-    bufferevent_setcb(bev, libwebsock_handshake, libwebsock_handle_send, libwebsock_do_event, (void *) client_state);
-    bufferevent_enable(bev, EV_READ | EV_WRITE);
+    return;
   }
+
+  client_state = (libwebsock_client_state *) lws_calloc(sizeof(libwebsock_client_state));
+  client_state->sockfd = fd;
+  client_state->flags |= STATE_CONNECTING;
+  client_state->control_callback = ctx->control_callback;
+  client_state->onopen = ctx->onopen;
+  client_state->onmessage = ctx->onmessage;
+  client_state->onclose = ctx->onclose;
+  client_state->onpong = ctx->onpong;
+  client_state->sa = (struct sockaddr_storage *) lws_malloc(sizeof(struct sockaddr_storage));
+  client_state->ctx = (void *) ctx;
+  memcpy(client_state->sa, &ss, sizeof(struct sockaddr_storage));
+  evutil_make_socket_nonblocking(fd);
+  bev = bufferevent_socket_new(ctx->base, fd, BEV_OPT_CLOSE_ON_FREE);
+  client_state->bev = bev;
+  bufferevent_setcb(bev, libwebsock_handshake, libwebsock_handle_send, libwebsock_do_event, (void *) client_state);
+  bufferevent_enable(bev, EV_READ | EV_WRITE);
 }
 
 void
