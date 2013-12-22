@@ -4,6 +4,7 @@ Makefile.in
 Makefile
 # http://www.gnu.org/software/autoconf
 /examples/ws-echo
+/examples/echo
 /autom4te.cache
 /aclocal.m4
 /compile
