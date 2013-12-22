@@ -10,6 +10,9 @@
 /* Define to 1 if you have the `event' library (-levent). */
 #define HAVE_LIBEVENT 1
 
+/* Define to 1 if you have the `pthread' library (-lpthread). */
+#define HAVE_LIBPTHREAD 1
+
 /* Define to 1 if your system has a GNU libc compatible `malloc' function, and
    to 0 otherwise. */
 #define HAVE_MALLOC 1

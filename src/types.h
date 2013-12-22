@@ -99,6 +99,10 @@ typedef struct _libwebsock_context {
         void *user_data; //context specific user data
 } libwebsock_context;
 
+typedef struct _libwebsock_onmessage_wrapper {
+  libwebsock_client_state *state;
+  libwebsock_message *msg;
+} libwebsock_onmessage_wrapper;
 
 typedef struct _libwebsock_fragmented {
         char *send;

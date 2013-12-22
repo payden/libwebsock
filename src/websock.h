@@ -63,6 +63,8 @@
 #include <event2/bufferevent_ssl.h>
 #endif
 
+#include <pthread.h>
+
 #include "types.h"
 #include "api.h"
 #include "frames.h"
@@ -132,6 +134,9 @@ void libwebsock_do_read(struct bufferevent *bev, void *ptr);
 void libwebsock_do_event(struct bufferevent *bev, short event, void *ptr);
 void libwebsock_handshake_finish(struct bufferevent *bev, libwebsock_client_state *state);
 void libwebsock_handshake(struct bufferevent *bev, void *ptr);
+void *libwebsock_pthread_onmessage(void *arg);
+void *libwebsock_pthread_onclose(void *arg);
+void *libwebsock_pthread_onopen(void *arg);
 void libwebsock_fragmented_add(libwebsock_fragmented *frag, char *buf, unsigned int len);
 void libwebsock_fragmented_finish(libwebsock_fragmented *frag);
 libwebsock_fragmented *libwebsock_fragmented_new(libwebsock_client_state *state);

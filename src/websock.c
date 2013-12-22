@@ -152,7 +152,11 @@ libwebsock_shutdown(libwebsock_client_state *state)
   }
 
   if ((state->flags & STATE_CONNECTED) && state->onclose) {
-    state->onclose(state);
+    pthread_t onclose_thread;
+    pthread_attr_t onclose_attr;
+    pthread_attr_init(&onclose_attr);
+    pthread_attr_setdetachstate(&onclose_attr, PTHREAD_CREATE_DETACHED);
+    pthread_create(&onclose_thread, &onclose_attr, libwebsock_pthread_onclose, (void *) state);
   }
   bufferevent_free(state->bev);
   //schedule cleanup.
@@ -449,6 +453,7 @@ libwebsock_dispatch_message(libwebsock_client_state *state)
   unsigned long long message_payload_len;
   int message_opcode, i;
   libwebsock_frame *current = state->current_frame;
+  libwebsock_message *msg = NULL;
   char *message_payload, *message_payload_orig, *rawdata_ptr;
 
   state->flags &= ~STATE_RECEIVING_FRAGMENT;
@@ -498,13 +503,54 @@ libwebsock_dispatch_message(libwebsock_client_state *state)
   first->state = 0;
   state->current_frame = first;
 
-  libwebsock_message msg = { .opcode = message_opcode, .payload_len = message_payload_len, .payload = message_payload_orig };
+  msg = (libwebsock_message *) lws_malloc(sizeof(libwebsock_message));
+  msg->opcode = message_opcode;
+  msg->payload_len = message_payload_len;
+  msg->payload = message_payload_orig;
+  
+  libwebsock_onmessage_wrapper *wrapper = (libwebsock_onmessage_wrapper *) lws_malloc(sizeof(libwebsock_onmessage_wrapper));
+  wrapper->state = state;
+  wrapper->msg = msg;
+
   if (state->onmessage != NULL) {
-    state->onmessage(state, &msg);
+    pthread_t onmessage_thread;
+    pthread_attr_t onmessage_attr;
+    pthread_attr_init(&onmessage_attr);
+    pthread_attr_setdetachstate(&onmessage_attr, PTHREAD_CREATE_DETACHED);
+    pthread_create(&onmessage_thread, &onmessage_attr, libwebsock_pthread_onmessage, (void *) wrapper);
+    //TODO: maybe check ret?  What can fail here?
   } else {
     fprintf(stderr, "No onmessage call back registered with libwebsock.\n");
   }
-  free(message_payload_orig);
+}
+
+void *
+libwebsock_pthread_onmessage(void *arg)
+{
+  libwebsock_onmessage_wrapper *wrapper = arg;
+  libwebsock_client_state *state = wrapper->state;
+  libwebsock_message *msg = wrapper->msg;
+  state->onmessage(state, msg);
+  free(msg->payload);
+  free(msg);
+  free(wrapper);
+  return NULL;
+}
+
+void *
+libwebsock_pthread_onopen(void *arg)
+{
+  libwebsock_client_state *state = arg;
+  state->onopen(state);
+  return NULL;
+}
+
+void *
+libwebsock_pthread_onclose(void *arg)
+{
+  libwebsock_client_state *state = arg;
+  state->onclose(state);
+  return NULL;
 }
 
 void
@@ -583,7 +629,11 @@ libwebsock_handshake_finish(struct bufferevent *bev, libwebsock_client_state *st
   ctx->clients_HEAD = state;
 
   if (state->onopen != NULL) {
-    state->onopen(state);
+    pthread_t onopen_thread;
+    pthread_attr_t onopen_attr;
+    pthread_attr_init(&onopen_attr);
+    pthread_attr_setdetachstate(&onopen_attr, PTHREAD_CREATE_DETACHED);
+    pthread_create(&onopen_thread, &onopen_attr, libwebsock_pthread_onopen, (void *) state);
   }
 }
 
