@@ -133,7 +133,9 @@ libwebsock_wait(libwebsock_context *ctx)
 {
   struct event *sig_event;
   sig_event = evsignal_new(ctx->base, SIGINT, libwebsock_handle_signal, (void *)ctx);
-  event_add(sig_event, NULL );
+  event_add(sig_event, NULL);
+  sig_event = evsignal_new(ctx->base, SIGUSR2, libwebsock_handle_signal, (void *)ctx);
+  event_add(sig_event, NULL);
   ctx->running = 1;
   event_base_loop(ctx->base, ctx->flags);
   ctx->running = 0;

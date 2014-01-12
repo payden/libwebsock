@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <signal.h>
 
 #include "websock.h"
 #include "sha1.h"
@@ -109,7 +110,16 @@ void
 libwebsock_handle_signal(evutil_socket_t sig, short event, void *ptr)
 {
   libwebsock_context *ctx = ptr;
-  event_base_loopexit(ctx->base, NULL);
+  switch (sig) {
+    case SIGUSR2:
+      //this signal is used to simply get libevent to loop
+      //when a separate thread callback has added data to a buffer
+      break;
+    case SIGINT:
+    default:
+      event_base_loopexit(ctx->base, NULL);
+      break;
+  }
 }
 
 void
@@ -318,7 +328,7 @@ libwebsock_handle_recv(struct bufferevent *bev, void *ptr)
   libwebsock_client_state *state = ptr;
   libwebsock_frame *current = NULL;
   struct evbuffer *input;
-  struct evbuffer_iovec iovec[8], *iovec_p;
+  struct evbuffer_iovec iovec[3], *iovec_p;
   int i, datalen, err, n_vec, consumed, in_fragment;
   char *buf;
   void (*frame_fn)(libwebsock_client_state *state);
@@ -357,13 +367,9 @@ libwebsock_handle_recv(struct bufferevent *bev, void *ptr)
   };
 
   input = bufferevent_get_input(bev);
-  n_vec = evbuffer_peek(input, -1, NULL, NULL, 0);
-  //callback should never get triggered if there's no data available
-  //also, n_vec really shouldn't be over 2 right now according to libevent docs
-  //we'll allocate 8 on the stack just in case libevent changes.
-  assert(n_vec > 0 && n_vec < 8);
+  n_vec = evbuffer_peek(input, -1, NULL, iovec, 2);
+  assert(n_vec > 0 && n_vec <= 2);
   iovec[n_vec].iov_base = NULL;
-  evbuffer_peek(input, -1, NULL, iovec, n_vec);
   iovec_p = iovec;
   consumed = 0;
   while ((buf = iovec_p->iov_base) != NULL) {
@@ -531,6 +537,10 @@ libwebsock_pthread_onmessage(void *arg)
   libwebsock_client_state *state = wrapper->state;
   libwebsock_message *msg = wrapper->msg;
   state->onmessage(state, msg);
+  /* Must manually flush output buffer because libevent calling code
+     may be finished by the time this thread's callback is done.
+     Raising this signal makes libevent run */
+  raise(SIGUSR2);
   free(msg->payload);
   free(msg);
   free(wrapper);
