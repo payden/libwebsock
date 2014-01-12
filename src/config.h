@@ -10,6 +10,9 @@
 /* Define to 1 if you have the `event' library (-levent). */
 #define HAVE_LIBEVENT 1
 
+/* Define to 1 if you have the `event_pthreads' library (-levent_pthreads). */
+#define HAVE_LIBEVENT_PTHREADS 1
+
 /* Define to 1 if you have the `pthread' library (-lpthread). */
 #define HAVE_LIBPTHREAD 1
 

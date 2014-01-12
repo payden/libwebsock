@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.60])
-AC_INIT([libwebsock], [1.0.6], [payden@paydensutherland.com])
+AC_INIT([libwebsock], [1.0.7], [payden@paydensutherland.com])
 AM_INIT_AUTOMAKE
 AC_DISABLE_STATIC
 AC_CONFIG_SRCDIR([src/websock.c])
@@ -27,6 +27,10 @@ AC_FUNC_MALLOC
 AC_FUNC_REALLOC
 AC_CHECK_FUNCS([memset socket strstr])
 
+AC_CHECK_LIB(event_pthreads, evthread_use_pthreads, [], [
+                                                echo "libevent_pthreads required, failing"
+                                                exit -1
+                                                ])
 AC_CHECK_LIB(pthread, pthread_create, [], [
                                                 echo "pthreads required, failing"
                                                 exit -1

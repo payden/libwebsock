@@ -204,6 +204,10 @@ libwebsock_bind_socket(libwebsock_context *ctx, evutil_socket_t sockfd)
 
 static struct event_base *
 libwebsock_make_event_base(void) {
+  if (evthread_use_pthreads()) {
+    fprintf(stderr, "Unable to enable use of pthreads for libevent.\n");
+    return NULL;
+  }
   struct event_base *base = event_base_new();
   if (!base) {
     fprintf(stderr, "Unable to create new event base.\n");

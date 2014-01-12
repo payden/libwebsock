@@ -302,7 +302,7 @@ libwebsock_handle_accept(evutil_socket_t listener, short event, void *arg)
   client_state->ctx = (void *) ctx;
   memcpy(client_state->sa, &ss, sizeof(struct sockaddr_storage));
   evutil_make_socket_nonblocking(fd);
-  bev = bufferevent_socket_new(ctx->base, fd, BEV_OPT_CLOSE_ON_FREE);
+  bev = bufferevent_socket_new(ctx->base, fd, BEV_OPT_CLOSE_ON_FREE | BEV_OPT_THREADSAFE);
   client_state->bev = bev;
   bufferevent_setcb(bev, libwebsock_handshake, libwebsock_handle_send, libwebsock_do_event, (void *) client_state);
   bufferevent_enable(bev, EV_READ | EV_WRITE);
