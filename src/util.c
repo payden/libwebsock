@@ -75,32 +75,70 @@ validate_utf8_sequence(uint8_t *s)
 void *
 lws_calloc(size_t size)
 {
+	pthread_mutex_lock(&global_alloc_free_lock);
+#ifdef LIBWEBSOCK_DEBUG
+	fprintf(stderr, "Lock aquired for calloc of size: %zd\n", size);
+#endif
   void *alloc = calloc(1, size);
   if (!alloc) {
     fprintf(stderr, "Failed calloc!  Exiting.\n");
     exit(-1);
   }
+  pthread_mutex_unlock(&global_alloc_free_lock);
+#ifdef LIBWEBSOCK_DEBUG
+  fprintf(stderr, "Lock released for calloc, address returned: %p.\n", alloc);
+#endif
   return alloc;
 }
 
 void *
 lws_malloc(size_t size)
 {
+	pthread_mutex_lock(&global_alloc_free_lock);
+#ifdef LIBWEBSOCK_DEBUG
+	fprintf(stderr, "Lock aquired for malloc of size: %zd\n", size);
+#endif
   void *alloc = malloc(size);
   if (!alloc) {
     fprintf(stderr, "Failed malloc!  Exiting.\n");
     exit(-1);
   }
+  pthread_mutex_unlock(&global_alloc_free_lock);
+#ifdef LIBWEBSOCK_DEBUG
+  fprintf(stderr, "Lock released for malloc, address returned: %p.\n", alloc);
+#endif
   return alloc;
+}
+
+void
+lws_free(void *ptr)
+{
+	pthread_mutex_lock(&global_alloc_free_lock);
+#ifdef LIBWEBSOCK_DEBUG
+	fprintf(stderr, "Lock aquired for free of: %p\n", ptr);
+#endif
+	free(ptr);
+	pthread_mutex_unlock(&global_alloc_free_lock);
+#ifdef LIBWEBSOCK_DEBUG
+	fprintf(stderr, "Lock released for free of: %p\n", ptr);
+#endif
 }
 
 void *
 lws_realloc(void *ptr, size_t size)
 {
+	pthread_mutex_lock(&global_alloc_free_lock);
+#ifdef LIBWEBSOCK_DEBUG
+	fprintf(stderr, "Lock aquired for realloc of addr: %p to size: %zd\n", ptr, size);
+#endif
   void *new = realloc(ptr, size);
   if (!new) {
     fprintf(stderr, "Failed realloc!  Exiting.\n");
     exit(-1);
   }
+  pthread_mutex_unlock(&global_alloc_free_lock);
+#ifdef LIBWEBSOCK_DEBUG
+	fprintf(stderr, "Lock released for realloc of addr: %p to size: %zd and new addr: %p\n", ptr, size, new);
+#endif
   return new;
 }

@@ -3,17 +3,14 @@
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #undef HAVE_DLFCN_H
 
+/* Define to 1 if you have the <event2/thread.h> header file. */
+#undef HAVE_EVENT2_THREAD_H
+
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
 
 /* Define to 1 if you have the `event' library (-levent). */
 #undef HAVE_LIBEVENT
-
-/* Define to 1 if you have the `event_pthreads' library (-levent_pthreads). */
-#undef HAVE_LIBEVENT_PTHREADS
-
-/* Define to 1 if you have the `pthread' library (-lpthread). */
-#undef HAVE_LIBPTHREAD
 
 /* Define to 1 if your system has a GNU libc compatible `malloc' function, and
    to 0 otherwise. */

@@ -117,7 +117,7 @@ libwebsock_bind_ssl_real(libwebsock_context *ctx, char *listen_host, char *port,
   hints.ai_flags = AI_PASSIVE;
   if ((getaddrinfo(listen_host, port, &hints, &servinfo)) != 0) {
     fprintf(stderr, "getaddrinfo failed during libwebsock_bind.\n");
-    free(ctx);
+    lws_free(ctx);
     exit(-1);
   }
   for (p = servinfo; p != NULL; p = p->ai_next) {
@@ -127,7 +127,7 @@ libwebsock_bind_ssl_real(libwebsock_context *ctx, char *listen_host, char *port,
     }
     if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
       perror("setsockopt");
-      free(ctx);
+      lws_free(ctx);
       exit(-1);
     }
     if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
@@ -140,7 +140,7 @@ libwebsock_bind_ssl_real(libwebsock_context *ctx, char *listen_host, char *port,
 
   if (p == NULL) {
     fprintf(stderr, "Failed to bind to address and port.  Exiting.\n");
-    free(ctx);
+    lws_free(ctx);
     exit(-1);
   }
 

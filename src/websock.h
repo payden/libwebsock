@@ -113,10 +113,17 @@
 #define STATE_RECEIVED_CLOSE_FRAME (1 << 7)
 #define STATE_FAILING_CONNECTION (1 << 8)
 
+//globals
+extern pthread_mutex_t global_alloc_free_lock;
+
 //function defs
+
 
 int libwebsock_send_fragment(libwebsock_client_state *state, const char *data, unsigned int len, int flags);
 void libwebsock_send_cleanup(const void *data, size_t len, void *arg);
+void libwebsock_cleanup_thread_list(evutil_socket_t sock, short what, void *arg);
+void libwebsock_cancel_state_threads(libwebsock_client_state *state);
+void libwebsock_insert_into_thread_list(libwebsock_client_state *state, pthread_t *tptr, enum WS_THREAD_TYPE type);
 void libwebsock_shutdown(libwebsock_client_state *state);
 void libwebsock_shutdown_after_send_cb(evutil_socket_t fd, short what, void *arg);
 void libwebsock_shutdown_after_send(struct bufferevent *bev, void *arg);

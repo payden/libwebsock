@@ -27,11 +27,13 @@ AC_FUNC_MALLOC
 AC_FUNC_REALLOC
 AC_CHECK_FUNCS([memset socket strstr])
 
-AC_CHECK_LIB(event_pthreads, evthread_use_pthreads, [], [
+AC_CHECK_HEADERS([event2/thread.h], [
+					LIBS="-levent_pthreads ${LIBS}"
+				    ], [
                                                 echo "libevent_pthreads required, failing"
                                                 exit -1
                                                 ])
-AC_CHECK_LIB(pthread, pthread_create, [], [
+AC_CHECK_LIB(pthread, pthread_create, [LIBS="-lpthread ${LIBS}"], [
                                                 echo "pthreads required, failing"
                                                 exit -1
                                                 ])

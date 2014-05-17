@@ -29,4 +29,5 @@ uint64_t lws_be64toh(uint64_t x);
 void *lws_malloc(size_t size);
 void *lws_calloc(size_t size);
 void *lws_realloc(void *ptr, size_t size);
+void lws_free(void *ptr);
 #endif /* UTIL_H_ */

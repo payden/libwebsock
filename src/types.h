@@ -28,6 +28,12 @@ enum WS_FRAME_STATE {
         sw_loaded_mask
 };
 
+enum WS_THREAD_TYPE {
+	th_onmessage = 0,
+	th_onclose = 1,
+	th_onopen = 2
+};
+
 typedef struct _libwebsock_frame {
         unsigned int fin;
         unsigned int opcode;
@@ -63,6 +69,13 @@ typedef struct _libwebsock_close_info {
         char reason[124];
 } libwebsock_close_info;
 
+typedef struct _thread_info {
+	pthread_t *thread;
+	struct _thread_info *next;
+	struct _thread_info *prev;
+	enum WS_THREAD_TYPE type;
+} thread_info;
+
 typedef struct _libwebsock_client_state {
         int sockfd;
         int flags;
@@ -70,6 +83,8 @@ typedef struct _libwebsock_client_state {
         libwebsock_frame *current_frame;
         struct sockaddr_storage *sa;
         struct bufferevent *bev;
+        thread_info *tlist;
+        pthread_mutex_t thread_lock;
         int (*onmessage)(struct _libwebsock_client_state *, libwebsock_message *);
         int (*control_callback)(struct _libwebsock_client_state *, libwebsock_frame *);
         int (*onopen)(struct _libwebsock_client_state *);
@@ -83,6 +98,11 @@ typedef struct _libwebsock_client_state {
         struct _libwebsock_client_state *next;
         struct _libwebsock_client_state *prev;
 } libwebsock_client_state;
+
+typedef struct _thread_state_wrapper {
+	pthread_t thread;
+	libwebsock_client_state *state;
+} thread_state_wrapper;
 
 typedef struct _libwebsock_context {
         int running;

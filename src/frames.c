@@ -54,9 +54,15 @@ libwebsock_free_all_frames(libwebsock_client_state *state)
       while (current != NULL) {
         next = current->next_frame;
         if (current->rawdata) {
-          free(current->rawdata);
+#ifdef LIBWEBSOCK_DEBUG
+        	fprintf(stderr, "[%s]: freeing current->rawdata at address: %p\n", __func__, current->rawdata);
+#endif
+          lws_free(current->rawdata);
         }
-        free(current);
+#ifdef LIBWEBSOCK_DEBUG
+        fprintf(stderr, "[%s]: freeing current at address: %p\n", __func__, current);
+#endif
+        lws_free(current);
         current = next;
       }
     }
@@ -87,8 +93,14 @@ libwebsock_cleanup_frames(libwebsock_frame *first)
     this = next;
     next = this->next_frame;
     if (this->rawdata != NULL) {
-      free(this->rawdata);
+#ifdef LIBWEBSOCK_DEBUG
+    	fprintf(stderr, "[%s]: freeing rawdata from frame with address: %p\n", __func__, this->rawdata);
+#endif
+      lws_free(this->rawdata);
     }
-    free(this);
+#ifdef LIBWEBSOCK_DEBUG
+    fprintf(stderr, "[%s]: freeing this from frame with address: %p\n", __func__, this);
+#endif
+    lws_free(this);
   }
 }

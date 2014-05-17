@@ -29,6 +29,7 @@
 
 #include "websock.h"
 
+pthread_mutex_t global_alloc_free_lock = PTHREAD_MUTEX_INITIALIZER;
 
 char *
 libwebsock_version_string(void)
@@ -156,7 +157,7 @@ libwebsock_bind(libwebsock_context *ctx, char *listen_host, char *port)
   hints.ai_flags = AI_PASSIVE;
   if ((getaddrinfo(listen_host, port, &hints, &servinfo)) != 0) {
     fprintf(stderr, "getaddrinfo failed during libwebsock_bind.\n");
-    free(ctx);
+    lws_free(ctx);
     exit(-1);
   }
   for (p = servinfo; p != NULL ; p = p->ai_next) {
@@ -181,7 +182,7 @@ libwebsock_bind(libwebsock_context *ctx, char *listen_host, char *port)
 
   if (p == NULL) {
     fprintf(stderr, "Failed to bind to address and port.  Exiting.\n");
-    free(ctx);
+    lws_free(ctx);
     exit(-1);
   }
 
@@ -208,6 +209,7 @@ libwebsock_make_event_base(void) {
     fprintf(stderr, "Unable to enable use of pthreads for libevent.\n");
     return NULL;
   }
+  event_set_mem_functions(lws_malloc, lws_realloc, lws_free);
   struct event_base *base = event_base_new();
   if (!base) {
     fprintf(stderr, "Unable to create new event base.\n");

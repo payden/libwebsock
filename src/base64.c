@@ -3,7 +3,7 @@
 #include <stdlib.h>
 
 #include "base64.h"
-
+#include "util.h"
 
 /**
  * characters used for Base64 encoding
@@ -174,7 +174,7 @@ size_t base64_decode(char *source, unsigned char *target, size_t targetlen)
     size_t converted = 0;
 
     /* concatinate '===' to the source to handle unpadded base64 data */
-    src = (char *)malloc(strlen(source)+5);
+    src = (char *)lws_malloc(strlen(source)+5);
     if (src == NULL)
  return -1;
     strcpy(src, source);
@@ -200,7 +200,7 @@ size_t base64_decode(char *source, unsigned char *target, size_t targetlen)
  /* check if the fit in the result buffer */
  if (targetlen < tmplen)
  {
-     free(src);
+     lws_free(src);
      return -1;
  }
 
@@ -211,7 +211,7 @@ size_t base64_decode(char *source, unsigned char *target, size_t targetlen)
  converted += tmplen;
     }
 
-    free(src);
+    lws_free(src);
     return converted;
 }
 
