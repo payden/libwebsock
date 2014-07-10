@@ -143,14 +143,49 @@ void libwebsock_populate_close_info_from_frame(libwebsock_close_info **info,
 	*info = new_info;
 }
 
-void libwebsock_cleanup_thread_list(evutil_socket_t sock, short what, void *arg) {
+void
+libwebsock_insert_into_thread_list(libwebsock_client_state *state, pthread_t *thread, enum WS_THREAD_TYPE type)
+{
+	pthread_mutex_lock(&state->thread_lock);
 #ifdef LIBWEBSOCK_DEBUG
-	fprintf(stderr, "[%s]: called with wrapper: %p\n", __func__, arg);
+	fprintf(stderr, "[%s]: acquired thread lock for state: %p\n", __func__, state);
+	fprintf(stderr, "[%s]: called with state: %p and thread at address %p and type: %d:\n", __func__, state, thread, type);
 #endif
+	thread_info *tinfo = NULL, *current = state->tlist;
+	tinfo = (thread_info *) lws_malloc(sizeof(thread_info));
+	memset(tinfo, 0, sizeof(thread_info));
+	tinfo->thread = thread;
+	tinfo->type = type;
+
+	/* we don't have a thread list for this state.  Set new thread_info and return */
+	if (current == NULL) {
+		state->tlist = tinfo;
+		pthread_mutex_unlock(&state->thread_lock);
+#ifdef LIBWEBSOCK_DEBUG
+		fprintf(stderr, "[%s]: released thread lock for state: %p\n", __func__, state);
+#endif
+		return;
+	}
+	/* there is at least one in state->tlist, iterate until next is null */
+	while (current->next != NULL) {
+		current = current->next;
+	}
+	current->next = tinfo;
+	tinfo->prev = current;
+	pthread_mutex_unlock(&state->thread_lock);
+#ifdef LIBWEBSOCK_DEBUG
+	fprintf(stderr, "[%s] released thread lock for state: %p\n", __func__, state);
+#endif
+}
+
+void libwebsock_cleanup_thread_list(evutil_socket_t sock, short what, void *arg) {
 	thread_state_wrapper *wrapper = arg;
 	thread_info *tinfo, *current = NULL;
 	pthread_t current_thread;
 	libwebsock_client_state *state = wrapper->state;
+#ifdef LIBWEBSOCK_DEBUG
+	fprintf(stderr, "[%s]: called with wrapper: %p and thread ID: %llu\n", __func__, wrapper, (unsigned long long) wrapper->thread);
+#endif
 	pthread_mutex_lock(&state->thread_lock);
 #ifdef LIBWEBSOCK_DEBUG
 	fprintf(stderr, "[%s]: acquired thread_lock for state: %p\n", __func__, wrapper->state);
@@ -163,6 +198,7 @@ void libwebsock_cleanup_thread_list(evutil_socket_t sock, short what, void *arg)
 
 
 	lws_free(wrapper);
+
 	for (tinfo = state->tlist; tinfo != NULL; tinfo = tinfo->next) {
 		current = tinfo;
 		current_thread = *((pthread_t *)tinfo->thread);
@@ -170,23 +206,48 @@ void libwebsock_cleanup_thread_list(evutil_socket_t sock, short what, void *arg)
 			if (current->prev == NULL && current->next == NULL) {
 				state->tlist = NULL;
 				pthread_mutex_unlock(&state->thread_lock);
+				lws_free(current);
+				lws_free(wrapper);
 				return;
 			}
+			//we either have current->prev or current->next or both
 			if (current->prev != NULL) {
+#ifdef LIBWEBSOCK_DEBUG
+				fprintf(stderr, "[%s]: found previous entry while removing current: [%p] -> prev: [%p]\n", __func__, current, current->prev);
+#endif
+#ifdef LIBWEBSOCK_DEBUG
+				fprintf(stderr, "[%s]: setting previous entry (%p)'s next to current's next (%p)\n", __func__, current->prev, current->next);
+#endif
 				current->prev->next = current->next;
-			} else {
-				state->tlist = current->next;
-			}
-			if (current->next != NULL) {
-				current->next->prev = current->prev;
+#ifdef LIBWEBSOCK_DEBUG
+				fprintf(stderr, "[%s]: current (%p) prev (%p)'s next (%p) should equal current's next (%p)\n", __func__, current, current->prev, current->prev->next, current->next);
+#endif
 			}
 
+			if (current->next != NULL) {
+#ifdef LIBWEBSOCK_DEBUG
+				fprintf(stderr, "[%s]: found next entry while removing current: [%p] -> next [%p]\n", __func__, current, current->next);
+#endif
+				current->next->prev = current->prev;
+#ifdef LIBWEBSOCK_DEBUG
+				fprintf(stderr, "[%s]: current (%p) next (%p)'s prev (%p) should equal current's prev (%p)\n", __func__, current, current->next, current->next->prev, current->prev);
+#endif
+			}
+			if (current == state->tlist) {
+#ifdef LIBWEBSOCK_DEBUG
+				fprintf(stderr, "[%s]: current thread we're removing was head of list (%p) == (%p)\n", __func__, current, state->tlist);
+#endif
+				state->tlist = current->next;
+				state->tlist->prev = NULL;
+			}
+			lws_free(current);
 		}
 	}
 	pthread_mutex_unlock(&state->thread_lock);
 #ifdef LIBWEBSOCK_DEBUG
 	fprintf(stderr, "[%s]: released thread lock for state: %p\n", __func__, state);
 #endif
+	lws_free(wrapper);
 }
 
 void libwebsock_shutdown(libwebsock_client_state *state) {
@@ -204,13 +265,7 @@ void libwebsock_shutdown(libwebsock_client_state *state) {
 	}
 	//TODO: may need to make this synchronous and not thread it out.
 	if ((state->flags & STATE_CONNECTED) && state->onclose) {
-		pthread_t *onclose_thread = (pthread_t *) lws_malloc(sizeof(pthread_t));
-		pthread_create(onclose_thread, NULL, libwebsock_pthread_onclose,
-				(void *) state);
-#ifdef LIBWEBSOCK_DEBUG
-		fprintf(stderr, "[%s]: created thread of type %d with id: %llu\n", __func__, th_onclose, (unsigned long long) *onclose_thread);
-#endif
-		libwebsock_insert_into_thread_list(state, onclose_thread, th_onclose);
+		state->onclose(state);
 	}
 	bufferevent_free(state->bev);
 	//schedule cleanup.
@@ -549,13 +604,6 @@ void libwebsock_handle_recv(struct bufferevent *bev, void *ptr) {
 	evbuffer_drain(input, consumed);
 }
 
-void libwebsock_cancel_state_threads(libwebsock_client_state *state) {
-	thread_info *tlist = state->tlist;
-	while (tlist != NULL) {
-		pthread_cancel(*((pthread_t *)tlist->thread));
-	}
-}
-
 void libwebsock_fail_connection(libwebsock_client_state *state,
 		unsigned short close_code) {
 	struct evbuffer *output = bufferevent_get_output(state->bev);
@@ -571,7 +619,7 @@ void libwebsock_fail_connection(libwebsock_client_state *state,
 	evbuffer_add(output, close_frame, 4);
 	state->flags |= STATE_SHOULD_CLOSE | STATE_SENT_CLOSE_FRAME
 			| STATE_FAILING_CONNECTION;
-	libwebsock_cancel_state_threads(state);
+
 }
 
 void libwebsock_dispatch_message(libwebsock_client_state *state) {
@@ -648,7 +696,9 @@ void libwebsock_dispatch_message(libwebsock_client_state *state) {
 
 
 	if (state->onmessage != NULL) {
-		pthread_create(tptr, NULL, libwebsock_pthread_onmessage, (void *) wrapper);
+		int ret;
+		ret = pthread_create(tptr, NULL, libwebsock_pthread_onmessage, (void *) wrapper);
+		assert(ret == 0);
 		libwebsock_insert_into_thread_list(state, tptr, th_onmessage);
 		//TODO: maybe check ret?  What can fail here?
 	} else {
@@ -656,41 +706,7 @@ void libwebsock_dispatch_message(libwebsock_client_state *state) {
 	}
 }
 
-void
-libwebsock_insert_into_thread_list(libwebsock_client_state *state, pthread_t *thread, enum WS_THREAD_TYPE type)
-{
-	pthread_mutex_lock(&state->thread_lock);
-#ifdef LIBWEBSOCK_DEBUG
-	fprintf(stderr, "[%s]: acquired thread lock for state: %p\n", __func__, state);
-	fprintf(stderr, "[%s]: called with state: %p and thread at address %p and type: %d:\n", __func__, state, thread, type);
-#endif
-	thread_info *tinfo = NULL, *current = state->tlist;
-	tinfo = (thread_info *) lws_calloc(sizeof(thread_info));
-	tinfo->thread = thread;
 
-	/* we don't have a thread list for this state.  Set new thread_info and return */
-	if (state->tlist == NULL) {
-		state->tlist = tinfo;
-		pthread_mutex_unlock(&state->thread_lock);
-#ifdef LIBWEBSOCK_DEBUG
-		fprintf(stderr, "[%s]: released thread lock for state: %p\n", __func__, state);
-#endif
-		return;
-	}
-	/* there is at least one in state->tlist, iterate until next is null */
-	while (current != NULL) {
-		if (current->next == NULL) {
-			break;
-		}
-		current = current->next;
-	}
-	current->next = tinfo;
-	tinfo->prev = current;
-	pthread_mutex_unlock(&state->thread_lock);
-#ifdef LIBWEBSOCK_DEBUG
-	fprintf(stderr, "[%s] released thread lock for state: %p\n", __func__, state);
-#endif
-}
 
 void *
 libwebsock_pthread_onmessage(void *arg) {
