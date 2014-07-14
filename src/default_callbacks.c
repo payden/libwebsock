@@ -75,6 +75,11 @@ libwebsock_default_control_callback(libwebsock_client_state *state, libwebsock_f
       if (!state->close_info && ctl_frame->payload_len >= 2) {
         libwebsock_populate_close_info_from_frame(&state->close_info, ctl_frame);
       }
+      if (ctl_frame->payload_len > 0 && ctl_frame->payload_len < 2) {
+        libwebsock_fail_connection(state, WS_CLOSE_PROTOCOL_ERROR);
+        libwebsock_shutdown(state);
+        return 0;
+      }
       if (state->close_info) {
         code = state->close_info->code;
         if ((code >= 0 && code < WS_CLOSE_NORMAL) || code == WS_CLOSE_RESERVED || code == WS_CLOSE_NO_CODE

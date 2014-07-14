@@ -196,9 +196,6 @@ void libwebsock_cleanup_thread_list(evutil_socket_t sock, short what, void *arg)
 #endif
 	pthread_join(wrapper->thread, NULL);
 
-
-	lws_free(wrapper);
-
 	for (tinfo = state->tlist; tinfo != NULL; tinfo = tinfo->next) {
 		current = tinfo;
 		current_thread = *((pthread_t *)tinfo->thread);
