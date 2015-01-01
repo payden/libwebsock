@@ -27,35 +27,20 @@ AC_FUNC_MALLOC
 AC_FUNC_REALLOC
 AC_CHECK_FUNCS([memset socket strstr])
 
-AC_CHECK_HEADERS([event2/thread.h], [
-					LIBS="-levent_pthreads ${LIBS}"
-				    ], [
-                                                echo "libevent_pthreads required, failing"
-                                                exit -1
-                                                ])
-AC_CHECK_LIB(pthread, pthread_create, [LIBS="-lpthread ${LIBS}"], [
+AC_CHECK_LIB(pthread, pthread_create, [PTHREAD_LIBS="-lpthread"], [
                                                 echo "pthreads required, failing"
                                                 exit -1
                                                 ])
-AC_CHECK_LIB(event, event_base_dispatch, [], [
-						echo "libevent required, failing"
-						exit -1
-						])
+
+PKG_CHECK_MODULES([EVENT], [libevent])
+PKG_CHECK_MODULES([EVENT_PTHREAD], [libevent_pthreads])
 
 AS_IF([test "x$with_ssl" != "xno"],
 	[
-  	AC_CHECK_LIB([ssl], [SSL_CTX_new],
-  		[
-  			LIBS="-lssl ${LIBS}"
-  			AC_CHECK_LIB([event_openssl], [bufferevent_openssl_socket_new], [
-  				LIBS="-levent_openssl ${LIBS}"
-  				have_ssl=yes
-  			], [have_ssl=no])
-  		], 
-  		[have_ssl=no])
-  	],
-  	[have_ssl=no])
-  	
+	PKG_CHECK_MODULES([SSL], [openssl], [have_ssl=yes], [have_ssl=no])
+	AS_IF([test "x${have_ssl}" = "xyes"],
+		[PKG_CHECK_MODULES([EVENT_OPENSSL], [libevent_openssl], [have_ssl=yes], [have_ssl=no])])])
+
 AS_IF([test "x$have_ssl" = "xyes"],
 	[
 		AC_DEFINE([WEBSOCK_HAVE_SSL], [1], [Define if building SSL support])
@@ -63,8 +48,11 @@ AS_IF([test "x$have_ssl" = "xyes"],
 	[AS_IF([test "x$with_ssl" = "xyes"],
 		[AC_MSG_ERROR([SSL support requested but not found])
 	])])
-  	
+
 AM_CONDITIONAL([HAVE_SSL], [test "x$have_ssl" = "xyes"])
+
+LIBS="${EVENT_LIBS} ${EVENT_PTHREAD_LIBS} ${PTHREAD_LIBS} ${SSL_LIBS} ${EVENT_OPENSSL_LIBS}"
+
 AC_DEFINE_UNQUOTED([WEBSOCK_PACKAGE_VERSION], ["$PACKAGE_VERSION"], [libwebsock version])
 AC_DEFINE_UNQUOTED([WEBSOCK_PACKAGE_STRING], ["$PACKAGE_STRING"], [libwebsock package string])
 AC_DEFINE_UNQUOTED([WEBSOCK_PACKAGE_NAME], ["$PACKAGE_NAME"], [libwebsock package name])
