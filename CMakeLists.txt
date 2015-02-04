@@ -11,11 +11,17 @@ find_package(OpenSSL)
 
 if (OPENSSL_FOUND)
     set(WEBSOCK_HAVE_SSL 1)
-    #add_definitions(-DWEBSOCK_HAVE_SSL)
 endif()
 
 find_package(Libevent REQUIRED)
+list(APPEND WEBSOCK_DEPS ${LIBEVENT_LIBRARIES})
+
 find_package(Threads)
+list(APPEND WEBSOCK_DEPS ${CMAKE_THREAD_LIBS_INIT})
+
+if (LINUX)
+    list(APPEND WEBSOCK_DEPS rt)
+endif()
 
 set(SRC_LIB
     src/api.c
@@ -39,6 +45,10 @@ set(HDR_LIB_PUBLIC
     src/utf.h
     src/util.h)
 
+if (WEBSOCK_HAVE_SSL)
+    list(APPEND SRC_LIB src/openssl.c)
+endif()
+
 source_group("Headers Lib Private"  FILES ${HDR_LIB_PRIVATE})
 source_group("Headers Lib Public"   FILES ${HDR_LIB_PUBLIC})
 source_group("Source Lib"           FILES ${SRC_LIB})
@@ -53,15 +63,16 @@ configure_file("${PROJECT_SOURCE_DIR}/websock_config.h.cmake" "${PROJECT_BINARY_
 
 include_directories(
     "${PROJECT_SOURCE_DIR}"
-    "${PROJECT_BINARY_DIR}/include")
+    "${PROJECT_BINARY_DIR}/include"
+    "${LIBEVENT_INCLUDE_DIR}")
 
 add_library(websock ${SRC_LIB} ${HDR_LIB_PRIVATE} ${HDR_LIB_PUBLIC})
 
-target_link_libraries(websock ${LIBEVENT_LIBRARIES} event_extra rt ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(websock ${WEBSOCK_DEPS})
 
 #
 # Examples
 #
 add_executable(autobahn-echo examples/autobahn-echo.c)
-target_link_libraries(autobahn-echo websock ${LIBEVENT_LIBRARIES} rt ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(autobahn-echo websock ${WEBSOCK_DEPS})
 
