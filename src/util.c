@@ -18,9 +18,9 @@
  */
 
 #include "websock.h"
+#include "utf.h"
 
-#define UTF8_ACCEPT 0
-#define UTF8_REJECT 1
+pthread_mutex_t global_alloc_free_lock = PTHREAD_MUTEX_INITIALIZER;
 
 //these functions assume little endian machine as they're only used on windows
 uint16_t

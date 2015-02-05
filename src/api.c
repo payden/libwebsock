@@ -21,15 +21,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
-#include <unistd.h>
 
 #ifndef _WIN32
+#include <unistd.h>
 #include <netdb.h>
 #endif
 
 #include "websock.h"
-
-pthread_mutex_t global_alloc_free_lock = PTHREAD_MUTEX_INITIALIZER;
 
 char *
 libwebsock_version_string(void)
@@ -135,8 +133,10 @@ libwebsock_wait(libwebsock_context *ctx)
   struct event *sig_event;
   sig_event = evsignal_new(ctx->base, SIGINT, libwebsock_handle_signal, (void *)ctx);
   event_add(sig_event, NULL);
+#ifndef _WIN32
   sig_event = evsignal_new(ctx->base, SIGUSR2, libwebsock_handle_signal, (void *)ctx);
   event_add(sig_event, NULL);
+#endif // _WIN32
   ctx->running = 1;
   event_base_loop(ctx->base, ctx->flags);
   ctx->running = 0;
@@ -168,13 +168,13 @@ libwebsock_bind(libwebsock_context *ctx, char *listen_host, char *port)
 
     evutil_make_socket_nonblocking(sockfd);
 
-    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
+	if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (char *)&yes, sizeof(int)) == -1) {
       perror("setsockopt");
     }
 
     if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
       perror("bind");
-      close(sockfd);
+      evutil_closesocket(sockfd);
       continue;
     }
     break;
@@ -205,10 +205,17 @@ libwebsock_bind_socket(libwebsock_context *ctx, evutil_socket_t sockfd)
 
 static struct event_base *
 libwebsock_make_event_base(void) {
+#ifdef _WIN32
+  if (evthread_use_windows_threads()) {
+    fprintf(stderr, "Unable to enable use of pthreads for libevent.\n");
+    return NULL;
+  }
+#else
   if (evthread_use_pthreads()) {
     fprintf(stderr, "Unable to enable use of pthreads for libevent.\n");
     return NULL;
   }
+#endif
   event_set_mem_functions(lws_malloc, lws_realloc, lws_free);
   struct event_base *base = event_base_new();
   if (!base) {
