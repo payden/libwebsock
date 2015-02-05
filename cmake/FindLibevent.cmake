@@ -10,7 +10,7 @@ foreach(prefix ${LibEvent_EXTRA_PREFIXES})
 	list(APPEND LIBEVENT_LIB_DIR_PATHS "${prefix}/lib")
 endforeach()
 
-find_path(LIBEVENT_INCLUDE_DIR event2/event.h)
+find_path(LIBEVENT_INCLUDE_DIRS event2/event.h)
 find_library(LIBEVENT_LIB NAMES libevent.a)
 find_library(LIBEVENT_PTHREADS_LIB NAMES libevent_pthreads.a)
 find_library(LIBEVENT_CORE_LIB NAMES libevent_core.a)
@@ -26,9 +26,9 @@ set(LIBEVENT_LIBRARIES
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(LibEvent DEFAULT_MSG
                                   LIBEVENT_LIBRARIES
-                                  LIBEVENT_INCLUDE_DIR)
+                                  LIBEVENT_INCLUDE_DIRS)
 
 mark_as_advanced(
     LIBEVENT_LIBRARIES
-    LIBEVENT_INCLUDE_DIR
+    LIBEVENT_INCLUDE_DIRS
   )
