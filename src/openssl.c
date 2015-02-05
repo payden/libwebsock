@@ -17,7 +17,9 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA
  */
 
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 
 #include "websock.h"
 
@@ -125,14 +127,14 @@ libwebsock_bind_ssl_real(libwebsock_context *ctx, char *listen_host, char *port,
       perror("socket");
       continue;
     }
-    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
+    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (char *)&yes, sizeof(int)) == -1) {
       perror("setsockopt");
       lws_free(ctx);
       exit(-1);
     }
     if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
       perror("bind");
-      close(sockfd);
+	  evutil_closesocket(sockfd);
       continue;
     }
     break;

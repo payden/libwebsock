@@ -20,7 +20,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 #include <signal.h>
 
 #include "websock.h"
@@ -33,7 +35,7 @@
 #define CC libwebsock_new_continuation_frame
 #define DD libwebsock_fail_and_cleanup
 
-static inline int libwebsock_read_header(libwebsock_frame *frame) {
+static int libwebsock_read_header(libwebsock_frame *frame) {
 	int i, new_size;
 	enum WS_FRAME_STATE state;
 
@@ -108,10 +110,12 @@ static inline int libwebsock_read_header(libwebsock_frame *frame) {
 void libwebsock_handle_signal(evutil_socket_t sig, short event, void *ptr) {
 	libwebsock_context *ctx = ptr;
 	switch (sig) {
+	#ifndef _WIN32
 	case SIGUSR2:
 		//this signal is used to simply get libevent to loop
 		//when a separate thread callback has added data to a buffer
 		break;
+	#endif // _WIN32
 	case SIGINT:
 	default:
 		event_base_loopexit(ctx->base, NULL);
@@ -184,7 +188,7 @@ void libwebsock_cleanup_thread_list(evutil_socket_t sock, short what, void *arg)
 	pthread_t current_thread;
 	libwebsock_client_state *state = wrapper->state;
 #ifdef LIBWEBSOCK_DEBUG
-	fprintf(stderr, "[%s]: called with wrapper: %p and thread ID: %llu\n", __func__, wrapper, (unsigned long long) wrapper->thread);
+//	fprintf(stderr, "[%s]: called with wrapper: %p and thread ID: %llu\n", __func__, wrapper, (unsigned long long) wrapper->thread);
 #endif
 	pthread_mutex_lock(&state->thread_lock);
 #ifdef LIBWEBSOCK_DEBUG
@@ -192,7 +196,7 @@ void libwebsock_cleanup_thread_list(evutil_socket_t sock, short what, void *arg)
 #endif
 
 #ifdef LIBWEBSOCK_DEBUG
-	fprintf(stderr, "[%s]: joining thread with id: %llu\n", __func__, (unsigned long long) wrapper->thread);
+//	fprintf(stderr, "[%s]: joining thread with id: %llu\n", __func__, (unsigned long long) wrapper->thread);
 #endif
 	pthread_join(wrapper->thread, NULL);
 
@@ -298,7 +302,7 @@ void libwebsock_post_shutdown_cleanup(evutil_socket_t fd, short what, void *arg)
 	while (info != NULL) {
 		this_thread = *((pthread_t *)info->thread);
 #ifdef LIBWEBSOCK_DEBUG
-		fprintf(stderr, "[%s]: Joining thread: %llu\n", __func__, (unsigned long long) this_thread);
+//		fprintf(stderr, "[%s]: Joining thread: %llu\n", __func__, (unsigned long long) this_thread);
 #endif
 		pthread_join(this_thread, NULL);
 		info = info->next;
@@ -707,18 +711,24 @@ void libwebsock_dispatch_message(libwebsock_client_state *state) {
 
 void *
 libwebsock_pthread_onmessage(void *arg) {
+	libwebsock_context *ctx;
+	thread_state_wrapper *twrapper;
 	libwebsock_onmessage_wrapper *wrapper = arg;
 	libwebsock_client_state *state = wrapper->state;
 	libwebsock_message *msg = wrapper->msg;
+	struct timeval tv = { 0, 20000 };
+	struct event *ev;
+
 	state->onmessage(state, msg);
 	/* Must manually flush output buffer because libevent calling code
 	 may be finished by the time this thread's callback is done.
 	 Raising this signal makes libevent run */
+	#ifndef _WIN32
 	raise(SIGUSR2);
-	struct timeval tv = { 0, 20000 };
-	struct event *ev;
-	libwebsock_context *ctx = (libwebsock_context *) wrapper->state->ctx;
-	thread_state_wrapper *twrapper = (thread_state_wrapper *) lws_malloc(sizeof(thread_state_wrapper));
+	#endif
+	
+	ctx = (libwebsock_context *) wrapper->state->ctx;
+	twrapper = (thread_state_wrapper *) lws_malloc(sizeof(thread_state_wrapper));
 	twrapper->state = wrapper->state;
 	twrapper->thread = pthread_self();
 	ev = event_new(ctx->base, -1, 0, libwebsock_cleanup_thread_list, (void *) twrapper);

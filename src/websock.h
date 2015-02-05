@@ -47,6 +47,10 @@
 #endif
 
 #ifdef _WIN32
+#define __func__ __FUNCTION__
+#ifndef snprintf
+#define snprintf _snprintf
+#endif
 #include <ws2tcpip.h>
 #endif
 
@@ -70,7 +74,6 @@
 #include "api.h"
 #include "frames.h"
 #include "default_callbacks.h"
-#include "utf.h"
 #include "util.h"
 
 
@@ -113,11 +116,7 @@
 #define STATE_RECEIVED_CLOSE_FRAME (1 << 7)
 #define STATE_FAILING_CONNECTION (1 << 8)
 
-//globals
-extern pthread_mutex_t global_alloc_free_lock;
-
-//function defs
-
+// function defs
 
 int libwebsock_send_fragment(libwebsock_client_state *state, const char *data, unsigned int len, int flags);
 void libwebsock_send_cleanup(const void *data, size_t len, void *arg);
