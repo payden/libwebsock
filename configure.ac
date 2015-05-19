@@ -33,15 +33,15 @@ AC_CHECK_HEADERS([event2/thread.h], [
                                                 echo "libevent_pthreads required, failing"
                                                 exit -1
                                                 ])
-AC_CHECK_LIB(pthread, pthread_create, [LIBS="-lpthread ${LIBS}"], [
-                                                echo "pthreads required, failing"
-                                                exit -1
-                                                ])
-AC_CHECK_LIB(event, event_base_dispatch, [], [
+AC_CHECK_LIB(event_core, event_base_dispatch, [], [
 						echo "libevent required, failing"
 						exit -1
 						])
 
+AC_CHECK_LIB(pthread, pthread_create, [LIBS="-lpthread ${LIBS}"], [
+                                                echo "pthreads required, failing"
+                                                exit -1
+                                                ])
 AS_IF([test "x$with_ssl" != "xno"],
 	[
   	AC_CHECK_LIB([ssl], [SSL_CTX_new],
