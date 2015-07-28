@@ -2,7 +2,7 @@
 #ifndef WEBSOCK_CONFIG_H
 #define WEBSOCK_CONFIG_H 1
 
-#define LIBWEBSOCK_DEBUG 0
+// #define LIBWEBSOCK_DEBUG 1
 
 #define WEBSOCK_PACKAGE_STRING "libwebsock 1.0.7"
 #define WEBSOCK_PACKAGE_VERSION "1.0.7"
