@@ -115,6 +115,26 @@ libwebsock_send_all_text(libwebsock_context *ctx, char *strdata)
 }
 
 int
+libwebsock_send_others_text(libwebsock_client_state *state, char *strdata)
+{
+  unsigned int count = 0;
+  unsigned int len = strlen(strdata);
+  int flags = WS_FRAGMENT_FIN | WS_OPCODE_TEXT;
+  libwebsock_context *ctx = state->ctx;
+  libwebsock_client_state *current;
+  if (ctx->clients_HEAD == NULL) {
+    return 0;
+  }
+  for (current = ctx->clients_HEAD; current != NULL; current = current->next) {
+    if(current == state) continue;
+    libwebsock_send_fragment(current, strdata, len, flags);
+    count++;
+  }
+
+  return count;
+}
+
+int
 libwebsock_send_text(libwebsock_client_state *state, char *strdata)
 {
   unsigned int len = strlen(strdata);

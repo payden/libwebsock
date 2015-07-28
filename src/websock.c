@@ -22,6 +22,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <signal.h>
+#include <netinet/tcp.h>
 
 #include "websock.h"
 #include "sha1.h"
@@ -436,8 +437,12 @@ int libwebsock_send_fragment(libwebsock_client_state *state, const char *data,
 	}
 	memcpy(frame + payload_offset, data, len);
 
+//	printf("Write limit: %d\n", bufferevent_get_write_limit(state->bev));
+
 	return evbuffer_add_reference(output, frame, frame_size,
 			libwebsock_send_cleanup, NULL);
+
+	//return bufferevent_flush(state->bev, EV_WRITE, BEV_FLUSH);
 }
 
 void libwebsock_handle_accept(evutil_socket_t listener, short event, void *arg) {
@@ -466,6 +471,12 @@ void libwebsock_handle_accept(evutil_socket_t listener, short event, void *arg) 
 	client_state->ctx = (void *) ctx;
 	memcpy(client_state->sa, &ss, sizeof(struct sockaddr_storage));
 	evutil_make_socket_nonblocking(fd);
+
+	// Disable Nagle Algorithm
+	int flag = 1;
+	int result = setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(flag));
+	if(result < 0) printf("Cannot disable Nagle Algorithm! (%d)\n", result);
+
 	bev = bufferevent_socket_new(ctx->base, fd,
 			BEV_OPT_CLOSE_ON_FREE | BEV_OPT_THREADSAFE);
 	client_state->bev = bev;
