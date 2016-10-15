@@ -15,6 +15,23 @@ AC_ARG_WITH([ssl],
   [AS_HELP_STRING([--without-ssl],[Disable building with SSL support])])
 
 
+# Check for pkg-config.
+PKG_PROG_PKG_CONFIG
+AC_ARG_VAR([PKG_CONFIG_PATH], "Additional directories for package discovery.")
+
+# Process options.
+#==============================================================================
+# Implement --with-pkgconfigdir and output ${pkgconfigdir}.
+#------------------------------------------------------------------------------
+AC_MSG_CHECKING([--with-pkgconfigdir option])
+AC_ARG_WITH([pkgconfigdir],
+    AS_HELP_STRING([--with-pkgconfigdir=DIR],
+        [Path to pkgconfig directory. @<:@default=${libdir}/pkgconfig@:>@]),
+    [pkgconfigdir=$withval],
+    [pkgconfigdir=${libdir}/pkgconfig])
+AC_MSG_RESULT([$pkgconfigdir])
+AC_SUBST([pkgconfigdir])
+
 
 # Checks for header files.
 AC_CHECK_HEADERS([netdb.h stdlib.h string.h sys/socket.h unistd.h])
@@ -68,5 +85,5 @@ AM_CONDITIONAL([HAVE_SSL], [test "x$have_ssl" = "xyes"])
 AC_DEFINE_UNQUOTED([WEBSOCK_PACKAGE_VERSION], ["$PACKAGE_VERSION"], [libwebsock version])
 AC_DEFINE_UNQUOTED([WEBSOCK_PACKAGE_STRING], ["$PACKAGE_STRING"], [libwebsock package string])
 AC_DEFINE_UNQUOTED([WEBSOCK_PACKAGE_NAME], ["$PACKAGE_NAME"], [libwebsock package name])
-AC_CONFIG_FILES([Makefile src/Makefile examples/Makefile])
+AC_CONFIG_FILES([Makefile libwebsock.pc src/Makefile examples/Makefile])
 AC_OUTPUT
